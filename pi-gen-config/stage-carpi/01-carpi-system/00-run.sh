@@ -117,30 +117,60 @@ EOF
 # ---------------------------------------------------------------------------
 # 6. WiFi Hotspot — static IP on wlan0
 # ---------------------------------------------------------------------------
-# Append to dhcpcd.conf (or create if not there)
-cat >> "${ROOTFS_DIR}/etc/dhcpcd.conf" << 'EOF'
+# Bookworm uses NetworkManager instead of dhcpcd.  We need to:
+#   a) Tell NetworkManager to leave wlan0 alone (hostapd manages it)
+#   b) Assign a static IP to wlan0 via systemd-networkd or a simple unit
+#   c) Disable wpa_supplicant so it doesn't fight hostapd
+
+# (a) Tell NetworkManager to ignore wlan0
+install -d "${ROOTFS_DIR}/etc/NetworkManager/conf.d"
+cat > "${ROOTFS_DIR}/etc/NetworkManager/conf.d/99-carpi-unmanaged.conf" << 'EOF'
+[keyfile]
+unmanaged-devices=interface-name:wlan0
+EOF
+
+# (b) Static IP via systemd-networkd (works on both Bookworm and Bullseye)
+cat > "${ROOTFS_DIR}/etc/systemd/network/10-carpi-wlan0.network" << 'EOF'
+[Match]
+Name=wlan0
+
+[Network]
+Address=192.168.4.1/24
+DHCPServer=no
+EOF
+
+on_chroot << 'EOF'
+systemctl enable systemd-networkd 2>/dev/null || true
+EOF
+
+# (b-fallback) Also write dhcpcd.conf in case this is a Bullseye-based build
+if [[ -f "${ROOTFS_DIR}/etc/dhcpcd.conf" ]]; then
+    cat >> "${ROOTFS_DIR}/etc/dhcpcd.conf" << 'EOF'
 
 # CarPi hotspot: static IP on wlan0, no DHCP client (we ARE the DHCP server)
 interface wlan0
     static ip_address=192.168.4.1/24
     nohook wpa_supplicant
 EOF
+fi
 
-# Disable wpa_supplicant on wlan0 — we use hostapd instead
+# (c) Disable wpa_supplicant so it doesn't fight hostapd for wlan0
 on_chroot << 'EOF'
 systemctl disable wpa_supplicant 2>/dev/null || true
 rfkill unblock wifi 2>/dev/null || true
 EOF
 
 # hostapd config
+install -d "${ROOTFS_DIR}/etc/hostapd"
 install -m 644 files/hostapd.conf "${ROOTFS_DIR}/etc/hostapd/hostapd.conf"
 
-# Tell hostapd where its config is
-sed -i 's|#DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' \
-    "${ROOTFS_DIR}/etc/default/hostapd"
+# Tell hostapd where its config is (Bullseye style)
+if [[ -f "${ROOTFS_DIR}/etc/default/hostapd" ]]; then
+    sed -i 's|#DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' \
+        "${ROOTFS_DIR}/etc/default/hostapd"
+fi
 
 # dnsmasq config (DHCP for phone clients)
-# Back up the default config and replace it
 cp "${ROOTFS_DIR}/etc/dnsmasq.conf" "${ROOTFS_DIR}/etc/dnsmasq.conf.orig" 2>/dev/null || true
 install -m 644 files/dnsmasq.conf "${ROOTFS_DIR}/etc/dnsmasq.conf"
 
