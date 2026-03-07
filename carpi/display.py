@@ -14,6 +14,7 @@
 import json
 import logging
 import os
+import socket
 import time
 
 import webview
@@ -85,6 +86,19 @@ def _needs_setup():
             and getattr(app_config, "OBD_MAC", "") == "AA:BB:CC:DD:EE:FF")
 
 
+def _get_local_ip():
+    """Get the machine's actual LAN/hotspot IP address."""
+    try:
+        # Connect to a dummy address to determine which interface is active
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return getattr(app_config, "HOTSPOT_IP", "192.168.4.1")
+
+
 def _build_setup_html():
     """Build an HDMI screen guiding the user to complete setup via phone."""
     theme = app_config.get_theme()
@@ -92,7 +106,7 @@ def _build_setup_html():
     glow = theme["glow"]
     ssid = getattr(app_config, "HOTSPOT_SSID", "CarPi")
     password = getattr(app_config, "HOTSPOT_PASSWORD", "carpi1234")
-    ip = getattr(app_config, "HOTSPOT_IP", "192.168.4.1")
+    ip = _get_local_ip()
     port = getattr(app_config, "WEB_PORT", 8080)
     return f"""<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -156,7 +170,7 @@ tailwind.config = {{
       <div class="text-sm font-semibold">Connect to WiFi</div>
       <div class="text-xs text-zinc-400 mt-0.5">
         On your phone, connect to <span class="accent font-bold">{ssid}</span>
-        {"&nbsp;&middot;&nbsp; Password: <span class='font-mono accent'>" + password + "</span>" if password else ""}
+        {"&nbsp;&middot;&nbsp; Password: <span class='font-mono accent'>" + password + "</span>" if password else "&nbsp;&middot;&nbsp; <span class='text-zinc-500'>No password</span>"}
       </div>
     </div>
   </div>
@@ -166,7 +180,7 @@ tailwind.config = {{
     <div>
       <div class="text-sm font-semibold">Open Browser</div>
       <div class="text-xs text-zinc-400 mt-0.5">
-        Go to <span class="accent font-bold font-mono">{ip}:{port}</span>
+        A setup page should open automatically. If not, go to <span class="accent font-bold font-mono">{ip}:{port}</span>
       </div>
     </div>
   </div>
