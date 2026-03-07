@@ -1,0 +1,259 @@
+#!/bin/bash -e
+# =============================================================================
+# 01-carpi-system/00-run.sh
+# =============================================================================
+# Runs during image build (in chroot) to configure the system layer:
+#   - Remove unnecessary packages (fast boot)
+#   - Configure Bluetooth (auto-enable, pairing policy)
+#   - Configure WiFi hotspot (hostapd + dnsmasq + static IP)
+#   - Configure HDMI display output
+#   - Disable login prompt (autologin to pi user, then systemd starts CarPi)
+#   - Tune boot parameters for speed
+#
+# pi-gen context: ${ROOTFS_DIR} is the target filesystem root.
+#                 on_chroot runs commands inside that root.
+# =============================================================================
+
+# on_chroot is provided by pi-gen's common.sh (sourced by the build system)
+# ROOTFS_DIR, STAGE_DIR are also provided by the build environment.
+
+echo "==> [01-carpi-system] Configuring CarPi system layer"
+
+# ---------------------------------------------------------------------------
+# 0. Install packages that have interactive conffile prompts
+# ---------------------------------------------------------------------------
+# hostapd ships /etc/default/hostapd as a conffile. When apt installs it
+# inside pi-gen's chroot (stdin = /dev/null), dpkg's conffile prompt causes
+# "end of file on stdin" and aborts the build. We install these here with
+# DEBIAN_FRONTEND=noninteractive and --force-confdef so dpkg never asks.
+on_chroot << 'EOF'
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" \
+    hostapd dnsmasq
+echo "hostapd and dnsmasq installed"
+EOF
+
+# ---------------------------------------------------------------------------
+# 1. Remove packages that waste space or slow boot
+# ---------------------------------------------------------------------------
+on_chroot << 'EOF'
+echo "Removing unnecessary packages..."
+apt-get remove -y --purge \
+    avahi-daemon \
+    triggerhappy \
+    rsyslog \
+    dphys-swapfile \
+    logrotate \
+    man-db \
+    manpages \
+    2>/dev/null || true
+
+apt-get autoremove -y --purge
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+echo "Package cleanup done"
+EOF
+
+# ---------------------------------------------------------------------------
+# 2. Disable swap (embedded device, no swapfile needed, saves writes to SD)
+# ---------------------------------------------------------------------------
+on_chroot << 'EOF'
+systemctl disable dphys-swapfile 2>/dev/null || true
+swapoff -a 2>/dev/null || true
+EOF
+
+# ---------------------------------------------------------------------------
+# 3. Disable services that don't belong on an embedded dashboard
+# ---------------------------------------------------------------------------
+on_chroot << 'EOF'
+for svc in \
+    avahi-daemon \
+    triggerhappy \
+    rsyslog \
+    apt-daily \
+    apt-daily-upgrade \
+    man-db \
+    ModemManager
+do
+    systemctl disable "$svc" 2>/dev/null || true
+    systemctl mask "$svc" 2>/dev/null || true
+done
+
+# Disable getty (login prompt) on tty1 — we use autologin instead
+systemctl disable getty@tty1 2>/dev/null || true
+EOF
+
+# ---------------------------------------------------------------------------
+# 4. Autologin as 'pi' on tty1 (systemd then starts CarPi)
+# ---------------------------------------------------------------------------
+# We configure autologin so that if CarPi crashes, the user gets a shell.
+# The carpi.service starts independently of this.
+install -d "${ROOTFS_DIR}/etc/systemd/system/getty@tty1.service.d"
+cat > "${ROOTFS_DIR}/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin pi --noclear %I $TERM
+EOF
+
+# ---------------------------------------------------------------------------
+# 5. Bluetooth configuration — auto-enable adapter on boot
+# ---------------------------------------------------------------------------
+install -d "${ROOTFS_DIR}/etc/bluetooth"
+install -m 644 files/bluetooth-main.conf "${ROOTFS_DIR}/etc/bluetooth/main.conf"
+
+on_chroot << 'EOF'
+systemctl enable bluetooth
+# Add pi user to bluetooth group so rfcomm doesn't need sudo
+usermod -aG bluetooth pi
+# udev rule: allow /dev/rfcomm* without root
+EOF
+
+cat > "${ROOTFS_DIR}/etc/udev/rules.d/99-rfcomm.rules" << 'EOF'
+KERNEL=="rfcomm*", MODE="0666"
+EOF
+
+# ---------------------------------------------------------------------------
+# 6. WiFi Hotspot — static IP on wlan0
+# ---------------------------------------------------------------------------
+# Append to dhcpcd.conf (or create if not there)
+cat >> "${ROOTFS_DIR}/etc/dhcpcd.conf" << 'EOF'
+
+# CarPi hotspot: static IP on wlan0, no DHCP client (we ARE the DHCP server)
+interface wlan0
+    static ip_address=192.168.4.1/24
+    nohook wpa_supplicant
+EOF
+
+# Disable wpa_supplicant on wlan0 — we use hostapd instead
+on_chroot << 'EOF'
+systemctl disable wpa_supplicant 2>/dev/null || true
+rfkill unblock wifi 2>/dev/null || true
+EOF
+
+# hostapd config
+install -m 644 files/hostapd.conf "${ROOTFS_DIR}/etc/hostapd/hostapd.conf"
+
+# Tell hostapd where its config is
+sed -i 's|#DAEMON_CONF=.*|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' \
+    "${ROOTFS_DIR}/etc/default/hostapd"
+
+# dnsmasq config (DHCP for phone clients)
+# Back up the default config and replace it
+cp "${ROOTFS_DIR}/etc/dnsmasq.conf" "${ROOTFS_DIR}/etc/dnsmasq.conf.orig" 2>/dev/null || true
+install -m 644 files/dnsmasq.conf "${ROOTFS_DIR}/etc/dnsmasq.conf"
+
+on_chroot << 'EOF'
+systemctl unmask hostapd 2>/dev/null || true
+systemctl enable hostapd
+systemctl enable dnsmasq
+EOF
+
+# ---------------------------------------------------------------------------
+# 7. Boot configuration — HDMI display settings
+# ---------------------------------------------------------------------------
+# Detect which config.txt path this Pi OS version uses
+BOOT_CONFIG="${ROOTFS_DIR}/boot/config.txt"
+[[ -f "${ROOTFS_DIR}/boot/firmware/config.txt" ]] && \
+    BOOT_CONFIG="${ROOTFS_DIR}/boot/firmware/config.txt"
+
+# Append CarPi display config to the boot config
+cat >> "${BOOT_CONFIG}" << 'EOF'
+
+# =============================================================================
+# CarPi Display Configuration
+# =============================================================================
+# Force HDMI on even if no monitor is detected at boot
+hdmi_force_hotplug=1
+
+# Custom display mode for 800x480 LCD
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt=800 480 60 6 0 0 0
+hdmi_drive=2
+
+# Disable overscan (black borders) — our display fills edge-to-edge
+disable_overscan=1
+
+# GPU memory — Kivy needs enough VRAM for OpenGL ES rendering
+gpu_mem=128
+
+# Disable the rainbow splash screen and text during boot for a cleaner startup
+disable_splash=1
+EOF
+
+# ---------------------------------------------------------------------------
+# 8. Plymouth boot splash — CarPi branded theme
+# ---------------------------------------------------------------------------
+# Install the custom CarPi Plymouth theme
+install -d "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi"
+install -m 644 files/plymouth-carpi/carpi.plymouth \
+    "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi/carpi.plymouth"
+install -m 644 files/plymouth-carpi/carpi.script \
+    "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi/carpi.script"
+install -m 644 files/plymouth-carpi/logo.png \
+    "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi/logo.png"
+install -m 644 files/plymouth-carpi/dot.png \
+    "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi/dot.png"
+
+# Set CarPi as the default Plymouth theme
+on_chroot << 'EOF'
+plymouth-set-default-theme carpi
+update-initramfs -u
+EOF
+
+# ---------------------------------------------------------------------------
+# 9. Kernel boot parameters — quiet and fast
+# ---------------------------------------------------------------------------
+# IMPORTANT: We do NOT replace cmdline.txt wholesale — pi-gen writes the
+# correct root=PARTUUID=... into it during the export phase.
+# We append our parameters to whatever pi-gen has already placed there.
+CMDLINE="${ROOTFS_DIR}/boot/cmdline.txt"
+[[ -f "${ROOTFS_DIR}/boot/firmware/cmdline.txt" ]] && \
+    CMDLINE="${ROOTFS_DIR}/boot/firmware/cmdline.txt"
+
+# cmdline.txt is a single line — read it, strip newline, append our params
+EXISTING=$(cat "${CMDLINE}" | tr -d '\n')
+for PARAM in "quiet" "splash" "loglevel=3" "logo.nologo" "vt.global_cursor_default=0"; do
+    if ! echo "${EXISTING}" | grep -q "${PARAM}"; then
+        EXISTING="${EXISTING} ${PARAM}"
+    fi
+done
+echo "${EXISTING}" > "${CMDLINE}"
+
+# ---------------------------------------------------------------------------
+# 10. Hostname
+# ---------------------------------------------------------------------------
+echo "carpi" > "${ROOTFS_DIR}/etc/hostname"
+# Update /etc/hosts to match
+sed -i "s/raspberrypi/carpi/g" "${ROOTFS_DIR}/etc/hosts" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# 11. Display permissions (no X11)
+# ---------------------------------------------------------------------------
+on_chroot << 'EOF'
+usermod -aG video,render,input,dialout pi
+EOF
+
+# Allow pi user to access /dev/fb0 and /dev/dri/* without root
+cat > "${ROOTFS_DIR}/etc/udev/rules.d/99-framebuffer.rules" << 'EOF'
+KERNEL=="fb*", MODE="0660", GROUP="video"
+EOF
+
+cat > "${ROOTFS_DIR}/etc/udev/rules.d/99-gpu.rules" << 'EOF'
+SUBSYSTEM=="drm", MODE="0660", GROUP="render"
+EOF
+
+# ---------------------------------------------------------------------------
+# 12. Set Kivy environment for headless display in pi user's profile
+# ---------------------------------------------------------------------------
+cat >> "${ROOTFS_DIR}/home/pi/.bashrc" << 'EOF'
+
+# CarPi: Kivy uses SDL2 with DRM/KMS backend (no X11 desktop)
+export KIVY_BCM_DISPMANX_ID=2
+EOF
+
+# Same for the service environment — done in the service file itself
+
+echo "==> [01-carpi-system] System configuration complete"

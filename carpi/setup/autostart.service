@@ -1,0 +1,73 @@
+# =============================================================================
+# autostart.service - CarPi systemd Service Unit
+# =============================================================================
+# Automatically starts the CarPi dashboard on boot.
+#
+# Install:
+#   sudo cp autostart.service /etc/systemd/system/carpi.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable carpi.service
+#
+# Or just run install.sh — it handles this automatically.
+#
+# Useful commands:
+#   sudo systemctl status carpi      # Check if running
+#   sudo systemctl start carpi       # Start now
+#   sudo systemctl stop carpi        # Stop now
+#   sudo journalctl -u carpi -f      # Follow live logs
+#   sudo journalctl -u carpi -n 50   # Last 50 log lines
+# =============================================================================
+
+[Unit]
+Description=CarPi OBD2 Dashboard
+Documentation=https://github.com/your-username/carpi
+# Start after network is up and Bluetooth is ready
+After=network.target bluetooth.target hostapd.service dnsmasq.service
+Wants=bluetooth.target hostapd.service dnsmasq.service
+# If Bluetooth restarts, restart CarPi too so it can reconnect
+PartOf=bluetooth.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+
+# Working directory — all relative imports resolve from here
+WorkingDirectory=/home/pi/carpi
+
+# Launch command
+ExecStart=/usr/bin/python3 /home/pi/carpi/main.py
+
+# Restart automatically if it crashes (e.g., OBD errors, display glitch)
+Restart=always
+RestartSec=5
+
+# Kivy display: use DRM/KMS backend directly, no X11 required
+Environment=KIVY_BCM_DISPMANX_ID=2
+Environment=DISPLAY=
+
+# Ensure Python output is not buffered (so logs appear in journalctl immediately)
+Environment=PYTHONUNBUFFERED=1
+
+# Allow Bluetooth access
+SupplementaryGroups=bluetooth video dialout
+
+# Resource limits — prevent runaway processes
+# CPUQuota=80%         # Uncomment to limit CPU usage
+# MemoryMax=256M       # Uncomment to limit memory usage
+
+# Security hardening — limit what the service can do
+# (Commented out — some may interfere with Bluetooth/display access)
+# PrivateTmp=true
+# NoNewPrivileges=true
+# ProtectSystem=strict
+# ReadWritePaths=/home/pi/carpi /dev/rfcomm0
+
+# How long to wait before force-killing on stop
+TimeoutStopSec=10
+
+# Log identifier in journalctl
+SyslogIdentifier=carpi
+
+[Install]
+WantedBy=multi-user.target

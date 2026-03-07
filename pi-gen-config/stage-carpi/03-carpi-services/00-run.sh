@@ -1,0 +1,34 @@
+#!/bin/bash -e
+# =============================================================================
+# 03-carpi-services/00-run.sh
+# =============================================================================
+# Installs and enables the carpi.service systemd unit.
+# This is what makes CarPi auto-start on every boot with no user interaction.
+# =============================================================================
+
+echo "==> [03-carpi-services] Installing systemd service"
+
+# Install the service unit file
+install -m 644 files/carpi.service "${ROOTFS_DIR}/etc/systemd/system/carpi.service"
+
+# Enable it so it starts on boot (equivalent to 'systemctl enable carpi')
+# In pi-gen chroot, systemctl enable works via symlinks in /etc/systemd/system/
+on_chroot << 'EOF'
+systemctl enable carpi.service
+echo "carpi.service enabled"
+EOF
+
+# ---------------------------------------------------------------------------
+# Bluetooth rfcomm bind helper service
+# ---------------------------------------------------------------------------
+# rfcomm bind must be run each boot before the carpi app starts.
+# We create a oneshot service that does this, ordered before carpi.service.
+install -m 644 files/carpi-rfcomm.service \
+    "${ROOTFS_DIR}/etc/systemd/system/carpi-rfcomm.service"
+
+on_chroot << 'EOF'
+systemctl enable carpi-rfcomm.service
+echo "carpi-rfcomm.service enabled"
+EOF
+
+echo "==> [03-carpi-services] Services installed"

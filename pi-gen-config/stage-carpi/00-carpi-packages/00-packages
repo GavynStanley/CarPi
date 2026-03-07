@@ -1,0 +1,46 @@
+# =============================================================================
+# 00-packages — System packages installed into the CarPi image
+# =============================================================================
+# pi-gen reads this file and runs: apt-get install -y <each line>
+# Keep this list minimal — only what CarPi actually needs.
+# Comments (#) and blank lines are ignored by pi-gen.
+# =============================================================================
+
+# --- Bluetooth stack ---
+# rfcomm is part of bluez in Bookworm — no separate package needed
+bluetooth
+bluez
+bluez-tools
+
+# --- WiFi hotspot ---
+# hostapd and dnsmasq are installed in 01-carpi-system/00-run.sh instead,
+# using DEBIAN_FRONTEND=noninteractive to suppress dpkg conffile prompts.
+# Installing them here via pi-gen's plain apt-get causes stdin-blocked
+# conffile prompts that abort the build.
+
+# --- Boot splash ---
+plymouth
+plymouth-themes
+
+# --- Display support ---
+# pywebview uses GTK + WebKit2 for rendering HTML on the HDMI screen
+gir1.2-webkit2-4.1
+python3-gi
+python3-gi-cairo
+libgirepository1.0-dev
+
+# --- Python runtime ---
+python3
+python3-pip
+
+# --- Utilities (minimal) ---
+# iptables — for NAT if you ever want to share internet through the Pi
+iptables
+# curl — useful for debugging API endpoints
+curl
+# git — for pulling app updates in the field (used by OTA update feature)
+git
+
+# --- Remove packages that slow boot or waste space ---
+# These are listed here for documentation; actual removal is in 01-carpi-system/00-run.sh
+# avahi-daemon, triggerhappy, rsyslog, dphys-swapfile

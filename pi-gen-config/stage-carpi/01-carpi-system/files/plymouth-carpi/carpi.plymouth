@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=CarPi
+Description=Minimal dark boot splash for CarPi OBD2 Dashboard
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/carpi
+ScriptFile=/usr/share/plymouth/themes/carpi/carpi.script

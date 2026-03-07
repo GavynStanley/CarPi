@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+# =============================================================================
+# main.py - CarPi Entry Point
+# =============================================================================
+# Starts all subsystems in the correct order:
+#   1. Logging setup
+#   2. OBD2 reader (background thread)
+#   3. Flask web server (background thread)
+#   4. pywebview HDMI display (main thread — GUI frameworks must run on main thread)
+#
+# The display loop blocks until the window is closed,
+# then the script shuts down cleanly.
+#
+# Run: python3 main.py
+# Auto-run on boot: see setup/autostart.service
+# =============================================================================
+
+import sys
+import time
+import signal
+import logging
+import threading
+
+# ---------------------------------------------------------------------------
+# Logging — set up before importing other modules so their loggers work
+# ---------------------------------------------------------------------------
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%H:%M:%S",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        # Optionally log to file — useful for debugging boot issues:
+        # logging.FileHandler("/var/log/carpi.log"),
+    ]
+)
+logger = logging.getLogger("main")
+
+# ---------------------------------------------------------------------------
+# Import project modules (after logging is configured)
+# ---------------------------------------------------------------------------
+
+import config
+import obd_reader
+import web_server
+import display
+
+
+# ---------------------------------------------------------------------------
+# Shutdown coordination
+# ---------------------------------------------------------------------------
+
+_shutdown_event = threading.Event()
+
+
+def _handle_signal(signum, frame):
+    """Gracefully handle SIGTERM/SIGINT (e.g., systemd stop, Ctrl+C)."""
+    logger.info(f"Received signal {signum} — shutting down")
+    _shutdown_event.set()
+
+
+signal.signal(signal.SIGTERM, _handle_signal)
+signal.signal(signal.SIGINT, _handle_signal)
+
+
+# ---------------------------------------------------------------------------
+# Startup
+# ---------------------------------------------------------------------------
+
+def start_obd_reader() -> obd_reader.OBDReader:
+    """Start the OBD2 polling thread."""
+    logger.info("Starting OBD2 reader thread")
+    reader = obd_reader.OBDReader()
+    reader.start()
+    return reader
+
+
+def start_web_server() -> threading.Thread:
+    """Start the Flask web server in a background daemon thread."""
+    logger.info(f"Starting web server on port {config.WEB_PORT}")
+    thread = threading.Thread(
+        target=web_server.run_server,
+        name="WebServer",
+        daemon=True   # Daemon threads exit automatically when main thread ends
+    )
+    thread.start()
+    return thread
+
+
+def main():
+    logger.info("=" * 60)
+    logger.info("CarPi Dashboard Starting")
+    logger.info(f"  Screen:     {config.SCREEN_WIDTH}x{config.SCREEN_HEIGHT}")
+    logger.info(f"  OBD2 MAC:   {config.OBD_MAC}")
+    logger.info(f"  Web server: http://{config.HOTSPOT_IP}:{config.WEB_PORT}")
+    logger.info("=" * 60)
+
+    # Validate MAC address — alert user if it's still the placeholder
+    if config.OBD_MAC == "AA:BB:CC:DD:EE:FF":
+        logger.warning("=" * 60)
+        logger.warning("OBD_MAC in config.py is still the placeholder value!")
+        logger.warning("Update it with your Veepeak adapter's actual MAC address.")
+        logger.warning("Find it by running:  hcitool scan")
+        logger.warning("OBD2 connection will be attempted but will likely fail.")
+        logger.warning("=" * 60)
+        time.sleep(3)  # Give user time to read the warning
+
+    # Start background services
+    obd_thread = start_obd_reader()
+    web_thread = start_web_server()
+
+    # Brief startup pause — let OBD thread begin its connection attempt
+    # and let the web server bind its port before the display renders
+    time.sleep(1)
+
+    # Run the pywebview display on the main thread
+    # This blocks until the window is closed
+    logger.info("Starting HDMI display (main thread)")
+    try:
+        display.run_display()
+    except KeyboardInterrupt:
+        logger.info("KeyboardInterrupt received")
+    except Exception as e:
+        logger.error(f"Display error: {e}", exc_info=True)
+
+    # --- Shutdown ---
+    logger.info("Display exited — shutting down")
+    _shutdown_event.set()
+
+    # Stop the OBD reader cleanly
+    obd_thread.stop()
+    obd_thread.join(timeout=5)
+    logger.info("OBD reader stopped")
+
+    # Web thread is a daemon — it exits automatically
+    logger.info("CarPi shutdown complete")
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
