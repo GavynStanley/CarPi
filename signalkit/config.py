@@ -56,6 +56,10 @@ OBD_CONNECT_TIMEOUT = 30         # Seconds to wait for connection on boot
 OBD_RECONNECT_DELAY = 5          # Seconds to wait before retrying after disconnect
 OBD_BT_CHANNEL = 1               # RFCOMM channel (most ELM327 adapters use 1)
 
+# --- Phone Bluetooth (internet tethering via PAN) ---
+PHONE_BT_MAC = ""                # Paired phone's MAC for Bluetooth PAN internet
+PHONE_BT_AUTO = 1                # 1 = auto-connect to phone PAN on boot
+
 # --- WiFi Hotspot ---
 HOTSPOT_SSID = "SignalKit"
 HOTSPOT_PASSWORD = "signalkit1234"   # Default WiFi password (change in setup wizard or settings)
@@ -257,6 +261,20 @@ EDITABLE_SETTINGS = {
         "type": "str",
         "restart": True,
         "description": "Leave blank for an open network. Must be 8+ characters if set.",
+    },
+    "PHONE_BT_MAC": {
+        "label": "Phone Bluetooth",
+        "type": "bt_phone",
+        "restart": False,
+        "description": "Pair your phone for internet access (Bluetooth tethering).",
+    },
+    "PHONE_BT_AUTO": {
+        "label": "Auto-Connect Phone",
+        "type": "select",
+        "options": [("1", "On"), ("0", "Off")],
+        "cast": "int",
+        "restart": False,
+        "description": "Automatically connect to phone's Bluetooth tethering on boot.",
     },
     "SETUP_COMPLETE": {
         "label": "Setup Complete",

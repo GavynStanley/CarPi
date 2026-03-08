@@ -813,6 +813,48 @@ tailwind.config = {{
 _window = None
 
 
+def _build_error_html(error_msg, hint=""):
+    """Build an error screen displayed on HDMI when something goes wrong."""
+    theme = app_config.get_theme()
+    accent = theme["accent"]
+    # Escape HTML in the error message
+    import html as html_mod
+    safe_msg = html_mod.escape(str(error_msg))
+    safe_hint = html_mod.escape(str(hint)) if hint else ""
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    background: #0a0a0a; color: #fff;
+    width: 800px; height: 480px; overflow: hidden; cursor: none;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 40px;
+  }}
+  .icon {{ font-size: 48px; margin-bottom: 16px; }}
+  .title {{ color: #ef4444; font-size: 20px; font-weight: 800; margin-bottom: 12px; }}
+  .msg {{
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px; padding: 16px 20px; max-width: 600px;
+    font-family: monospace; font-size: 12px; color: #a1a1aa;
+    word-break: break-word; white-space: pre-wrap; text-align: left;
+    max-height: 200px; overflow-y: auto;
+  }}
+  .hint {{ color: #71717a; font-size: 12px; margin-top: 16px; text-align: center; }}
+  .retry {{ color: {accent}; font-size: 13px; margin-top: 20px; animation: pulse 2s ease-in-out infinite; }}
+  @keyframes pulse {{ 0%,100% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} }}
+</style></head>
+<body>
+  <div class="icon">&#9888;</div>
+  <div class="title">Something went wrong</div>
+  <div class="msg">{safe_msg}</div>
+  {"<div class='hint'>" + safe_hint + "</div>" if safe_hint else ""}
+  <div class="retry">Restarting automatically&hellip;</div>
+</body></html>"""
+
+
 def run_display():
     """Entry point called from main.py. Blocks until the window is closed."""
     global _window
@@ -821,11 +863,15 @@ def run_display():
     # Register callback so config changes push to the display instantly
     app_config._on_setting_changed = _on_setting_changed_handler
 
-    if _needs_setup():
-        html = _build_setup_html()
-        logger.info("Showing setup guidance screen on HDMI")
-    else:
-        html = _build_html()
+    try:
+        if _needs_setup():
+            html = _build_setup_html()
+            logger.info("Showing setup guidance screen on HDMI")
+        else:
+            html = _build_html()
+    except Exception as e:
+        logger.error(f"Failed to build dashboard HTML: {e}", exc_info=True)
+        html = _build_error_html(e, "The dashboard failed to render. Check journalctl -u signalkit for details.")
 
     _window = webview.create_window(
         "SignalKit Dashboard",

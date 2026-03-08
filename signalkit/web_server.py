@@ -530,6 +530,52 @@ SETTINGS_HTML = """<!DOCTYPE html>
             <div class="text-xs font-medium mt-1.5 min-h-[16px]" id="fb-{{ key }}"></div>
           </div>
 
+          {% elif s.type == 'bt_phone' %}
+          <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-2.5" id="field-{{ key }}">
+            <input type="hidden" id="input-{{ key }}" value="{{ s.value }}"
+              data-key="{{ key }}" data-restart="false">
+            <div class="flex justify-between items-center gap-2.5 mb-3">
+              <label class="text-sm font-medium flex-1">{{ s.label }}</label>
+            </div>
+            <!-- Phone PAN status -->
+            <div id="phone-status" class="bg-black/30 border border-zinc-700 rounded-lg px-3 py-2.5 mb-2">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-acc shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
+                <span class="text-sm flex-1" id="phone-label">{% if s.value %}Paired: <span class="font-mono text-xs">{{ s.value }}</span>{% else %}No phone paired{% endif %}</span>
+                <span id="phone-pan-dot" class="w-2 h-2 rounded-full bg-zinc-600"></span>
+              </div>
+              <div id="phone-pan-info" class="text-xs text-zinc-500 mt-1 hidden"></div>
+            </div>
+            <!-- Action buttons -->
+            <div class="flex gap-2 mt-2">
+              {% if s.value %}
+              <button type="button" onclick="phoneConnect()" id="phone-connect-btn"
+                class="flex-1 bg-acc text-white font-bold text-xs px-3 py-2.5 rounded-lg hover:opacity-90">Connect PAN</button>
+              <button type="button" onclick="phoneDisconnect()" id="phone-disconnect-btn"
+                class="bg-zinc-700 text-zinc-300 font-bold text-xs px-3 py-2.5 rounded-lg hover:opacity-90 hidden">Disconnect</button>
+              <button type="button" onclick="phoneUnpair()"
+                class="bg-zinc-800 text-red-400 font-bold text-xs px-3 py-2.5 rounded-lg hover:opacity-90">Unpair</button>
+              {% else %}
+              <button type="button" onclick="phoneScan()" id="phone-scan-btn"
+                class="flex-1 bg-acc text-white font-bold text-xs px-3 py-2.5 rounded-lg hover:opacity-90 flex items-center justify-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Scan &amp; Pair Phone
+              </button>
+              {% endif %}
+            </div>
+            <!-- Scan results for pairing -->
+            <div id="phone-devices" class="hidden mt-2">
+              <div class="text-[0.65rem] text-zinc-500 uppercase tracking-wider font-semibold mb-1.5">Nearby Devices</div>
+              <div id="phone-device-list" class="space-y-1"></div>
+            </div>
+            <div id="phone-scanning" class="hidden flex items-center justify-center gap-2 py-4 text-sm text-zinc-400">
+              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
+              Scanning for devices…
+            </div>
+            {% if s.description %}<div class="text-xs text-zinc-500 mt-2 leading-relaxed">{{ s.description }}</div>{% endif %}
+            <div class="text-xs font-medium mt-1.5 min-h-[16px]" id="fb-{{ key }}"></div>
+          </div>
+
           {% else %}
           <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-2.5" id="field-{{ key }}">
             <div class="flex justify-between items-center gap-2.5">
@@ -772,6 +818,156 @@ SETTINGS_HTML = """<!DOCTYPE html>
         }
       });
       await saveSetting('OBD_MAC');
+    }
+
+    // --- Phone Bluetooth PAN ---
+    async function phoneScan() {
+      const btn = document.getElementById('phone-scan-btn');
+      const spinner = document.getElementById('phone-scanning');
+      const devicesWrap = document.getElementById('phone-devices');
+      const list = document.getElementById('phone-device-list');
+
+      btn.disabled = true;
+      btn.classList.add('opacity-50');
+      spinner.classList.remove('hidden');
+      devicesWrap.classList.add('hidden');
+      list.innerHTML = '';
+
+      try {
+        const resp = await fetch('/api/bt-scan', { method: 'POST' });
+        const data = await resp.json();
+        spinner.classList.add('hidden');
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+
+        if (!data.ok || !data.devices.length) {
+          list.innerHTML = '<div class="text-xs text-zinc-500 py-2">No devices found. Make sure Bluetooth is on.</div>';
+          devicesWrap.classList.remove('hidden');
+          return;
+        }
+
+        list.innerHTML = data.devices.map(d =>
+          `<button type="button" onclick="phonePair('${d.mac}')"
+            class="w-full flex items-center gap-2.5 bg-black/30 border border-zinc-700 hover:border-acc rounded-lg px-3 py-2.5 text-left transition-all">
+            <svg class="w-4 h-4 text-zinc-500 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate">${d.name}</div>
+              <div class="text-xs font-mono text-zinc-500">${d.mac}</div>
+            </div>
+            <span class="text-[0.6rem] font-bold text-acc">PAIR</span>
+          </button>`
+        ).join('');
+        devicesWrap.classList.remove('hidden');
+      } catch (e) {
+        spinner.classList.add('hidden');
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+      }
+    }
+
+    async function phonePair(mac) {
+      const fb = document.getElementById('fb-PHONE_BT_MAC');
+      fb.textContent = 'Pairing...';
+      fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] text-amber-400';
+
+      try {
+        const resp = await fetch('/api/phone/pair', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mac }),
+        });
+        const data = await resp.json();
+        if (data.ok) {
+          fb.textContent = 'Paired! Enable Bluetooth tethering on your phone.';
+          fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] text-emerald-400';
+          // Reload page to show paired state
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          fb.textContent = data.message || 'Pairing failed';
+          fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] text-red-400';
+        }
+      } catch (e) {
+        fb.textContent = 'Network error during pairing';
+        fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] text-red-400';
+      }
+    }
+
+    async function phoneUnpair() {
+      const fb = document.getElementById('fb-PHONE_BT_MAC');
+      try {
+        const resp = await fetch('/api/phone/unpair', { method: 'POST' });
+        const data = await resp.json();
+        fb.textContent = data.ok ? 'Phone unpaired' : (data.message || 'Failed');
+        fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] ' + (data.ok ? 'text-emerald-400' : 'text-red-400');
+        if (data.ok) setTimeout(() => location.reload(), 1000);
+      } catch (e) {
+        fb.textContent = 'Network error';
+        fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] text-red-400';
+      }
+    }
+
+    async function phoneConnect() {
+      const btn = document.getElementById('phone-connect-btn');
+      const fb = document.getElementById('fb-PHONE_BT_MAC');
+      btn.disabled = true;
+      btn.textContent = 'Connecting...';
+      fb.textContent = '';
+
+      try {
+        const resp = await fetch('/api/phone/connect', { method: 'POST' });
+        const data = await resp.json();
+        btn.disabled = false;
+        if (data.ok) {
+          btn.textContent = 'Connected';
+          fb.textContent = data.message;
+          fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] text-emerald-400';
+          pollPhoneStatus();
+        } else {
+          btn.textContent = 'Connect PAN';
+          fb.textContent = data.message || 'Connection failed';
+          fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] text-red-400';
+        }
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Connect PAN';
+        fb.textContent = 'Network error';
+        fb.className = 'text-xs font-medium mt-1.5 min-h-[16px] text-red-400';
+      }
+    }
+
+    async function phoneDisconnect() {
+      await fetch('/api/phone/disconnect', { method: 'POST' });
+      pollPhoneStatus();
+    }
+
+    async function pollPhoneStatus() {
+      try {
+        const resp = await fetch('/api/phone/status');
+        const s = await resp.json();
+        const dot = document.getElementById('phone-pan-dot');
+        const info = document.getElementById('phone-pan-info');
+        const connBtn = document.getElementById('phone-connect-btn');
+        const discBtn = document.getElementById('phone-disconnect-btn');
+
+        if (s.connected) {
+          dot.className = 'w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_6px_#22c55e]';
+          info.textContent = `IP: ${s.ip || 'obtaining...'} · Internet: ${s.has_internet ? 'Yes' : 'No'}`;
+          info.classList.remove('hidden');
+          if (connBtn) { connBtn.classList.add('hidden'); }
+          if (discBtn) { discBtn.classList.remove('hidden'); }
+        } else {
+          dot.className = 'w-2 h-2 rounded-full bg-zinc-600';
+          info.classList.add('hidden');
+          if (connBtn) { connBtn.classList.remove('hidden'); connBtn.textContent = 'Connect PAN'; }
+          if (discBtn) { discBtn.classList.add('hidden'); }
+        }
+      } catch (e) {}
+    }
+
+    // Poll phone status on load if paired
+    if (document.getElementById('phone-connect-btn')) {
+      pollPhoneStatus();
+      setInterval(pollPhoneStatus, 10000);
     }
   </script>
 </body>
@@ -1463,10 +1659,12 @@ _GROUPS = {
     "SHOW_SPARKLINES": "Display",
     "LAYOUT_METRICS": "Dashboard Layout",
     "LAYOUT_SLOW": "Dashboard Layout",
+    "PHONE_BT_MAC": "Phone",
+    "PHONE_BT_AUTO": "Phone",
 }
 
 
-_GROUP_ORDER = ["OBD2 Connection", "Warning Thresholds", "Display", "Dashboard Layout", "WiFi Hotspot"]
+_GROUP_ORDER = ["OBD2 Connection", "Warning Thresholds", "Display", "Dashboard Layout", "WiFi Hotspot", "Phone"]
 
 _TAB_LABELS = {
     "OBD2 Connection": "OBD2",
@@ -1474,6 +1672,7 @@ _TAB_LABELS = {
     "Display": "Display",
     "Dashboard Layout": "Layout",
     "WiFi Hotspot": "WiFi",
+    "Phone": "Phone",
 }
 
 
@@ -1904,19 +2103,20 @@ def api_bt_scan():
 
 def _bt_scan_linux():
     """Scan using bluetoothctl (Raspberry Pi / Linux)."""
-    subprocess.run(
-        ["bluetoothctl"], input="power on\nscan on\n",
-        capture_output=True, text=True, timeout=3,
-    )
-    time.sleep(6)
+    # Ensure Bluetooth is unblocked and powered on
+    subprocess.run(["rfkill", "unblock", "bluetooth"], capture_output=True, timeout=3)
+    subprocess.run(["bluetoothctl", "power", "on"], capture_output=True, text=True, timeout=5)
+    # Start discovery scan
+    subprocess.run(["bluetoothctl", "scan", "on"], capture_output=True, text=True, timeout=2)
+    time.sleep(8)
+    # Stop scan and list discovered devices
+    subprocess.run(["bluetoothctl", "scan", "off"], capture_output=True, text=True, timeout=3)
     proc = subprocess.run(
-        ["bluetoothctl"], input="scan off\ndevices\n",
-        capture_output=True, text=True, timeout=5,
+        ["bluetoothctl", "devices"], capture_output=True, text=True, timeout=5,
     )
-    output = proc.stdout + proc.stderr
     devices = []
     seen = set()
-    for line in output.splitlines():
+    for line in proc.stdout.splitlines():
         line = line.strip()
         if line.startswith("Device "):
             parts = line.split(" ", 2)
@@ -1974,6 +2174,74 @@ def _bt_scan_macos():
         pass
 
     return jsonify({"ok": True, "devices": devices})
+
+
+# ---------------------------------------------------------------------------
+# Bluetooth Phone Pairing & PAN (internet tethering)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/phone/pair", methods=["POST"])
+def api_phone_pair():
+    """Pair with a phone for Bluetooth PAN internet tethering."""
+    import bt_pan
+    data = request.get_json(force=True)
+    mac = data.get("mac", "").strip()
+    if not mac:
+        return jsonify({"ok": False, "error": "No MAC address provided"})
+
+    ok, msg = bt_pan.bt_pair(mac)
+    if ok:
+        # Save the phone MAC to config
+        config.save_setting("PHONE_BT_MAC", mac)
+    return jsonify({"ok": ok, "message": msg})
+
+
+@app.route("/api/phone/unpair", methods=["POST"])
+def api_phone_unpair():
+    """Remove a paired phone."""
+    import bt_pan
+    mac = getattr(config, "PHONE_BT_MAC", "")
+    if not mac:
+        return jsonify({"ok": False, "error": "No phone paired"})
+
+    bt_pan.bt_disconnect_pan(mac)
+    ok, msg = bt_pan.bt_unpair(mac)
+    if ok:
+        config.save_setting("PHONE_BT_MAC", "")
+    return jsonify({"ok": ok, "message": msg})
+
+
+@app.route("/api/phone/connect", methods=["POST"])
+def api_phone_connect():
+    """Connect to paired phone's Bluetooth PAN for internet."""
+    import bt_pan
+    mac = getattr(config, "PHONE_BT_MAC", "")
+    if not mac:
+        return jsonify({"ok": False, "error": "No phone paired — pair a phone first"})
+
+    ok, msg = bt_pan.bt_connect_pan(mac)
+    return jsonify({"ok": ok, "message": msg})
+
+
+@app.route("/api/phone/disconnect", methods=["POST"])
+def api_phone_disconnect():
+    """Disconnect from phone's Bluetooth PAN."""
+    import bt_pan
+    mac = getattr(config, "PHONE_BT_MAC", "")
+    if mac:
+        bt_pan.bt_disconnect_pan(mac)
+    return jsonify({"ok": True, "message": "Disconnected"})
+
+
+@app.route("/api/phone/status", methods=["GET"])
+def api_phone_status():
+    """Get Bluetooth PAN connection status."""
+    import bt_pan
+    mac = getattr(config, "PHONE_BT_MAC", "")
+    status = bt_pan.get_pan_status()
+    status["phone_mac"] = mac
+    status["auto_connect"] = bool(getattr(config, "PHONE_BT_AUTO", 0))
+    return jsonify(status)
 
 
 @app.route("/api/restart", methods=["POST"])

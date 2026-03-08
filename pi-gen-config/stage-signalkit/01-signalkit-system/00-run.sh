@@ -257,7 +257,7 @@ CMDLINE="${ROOTFS_DIR}/boot/cmdline.txt"
 
 # cmdline.txt is a single line — read it, strip newline, append our params
 EXISTING=$(cat "${CMDLINE}" | tr -d '\n')
-for PARAM in "modules-load=dwc2,g_ether" "quiet" "splash" "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "systemd.show_status=false" "rd.systemd.show_status=false" "console=tty3"; do
+for PARAM in "modules-load=dwc2,g_ether" "quiet" "splash" "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "systemd.show_status=false" "rd.systemd.show_status=false" "console=tty3" "consoleblank=0"; do
     if ! echo "${EXISTING}" | grep -q "${PARAM}"; then
         EXISTING="${EXISTING} ${PARAM}"
     fi

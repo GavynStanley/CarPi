@@ -10,6 +10,9 @@
 bluetooth
 bluez-tools
 
+# --- Networking (BT PAN tethering needs DHCP client) ---
+isc-dhcp-client
+
 # --- WiFi hotspot ---
 # hostapd and dnsmasq are installed in 01-signalkit-system/00-run.sh instead,
 # using DEBIAN_FRONTEND=noninteractive to suppress dpkg conffile prompts.

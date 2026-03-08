@@ -17,14 +17,18 @@ Type=simple
 # vt7 avoids conflicts with the kernel console on vt1
 # -nocursor hides the mouse cursor (touchscreen/no-mouse kiosk)
 # -ac disables host-based access control so the pi user can connect
-ExecStart=/usr/bin/X :0 -nolisten tcp -nocursor -ac vt7
-# Set root window to black immediately (no white flash while app loads)
-# The - prefix makes these non-fatal (X may not be fully ready yet)
-ExecStartPost=-/usr/bin/xsetroot -display :0 -solid black
-# Disable DPMS and screen blanking — kiosk display must stay on permanently
-ExecStartPost=-/usr/bin/xset -display :0 s off
-ExecStartPost=-/usr/bin/xset -display :0 -dpms
-ExecStartPost=-/usr/bin/xset -display :0 s noblank
+ExecStart=/usr/bin/X :0 -nolisten tcp -nocursor -ac vt7 -dpms
+# Wait for X to accept connections, then disable screen blanking and DPMS.
+# ExecStartPost runs in parallel with ExecStart, so we must poll for readiness.
+ExecStartPost=/bin/bash -c '\
+  for i in $(seq 1 20); do \
+    xdpyinfo -display :0 >/dev/null 2>&1 && break; \
+    sleep 0.5; \
+  done; \
+  DISPLAY=:0 xsetroot -solid "#111111" 2>/dev/null; \
+  DISPLAY=:0 xset s off 2>/dev/null; \
+  DISPLAY=:0 xset -dpms 2>/dev/null; \
+  DISPLAY=:0 xset s noblank 2>/dev/null'
 Restart=always
 RestartSec=3
 

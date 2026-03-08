@@ -48,10 +48,13 @@ logging.getLogger("obd.obd").setLevel(logging.ERROR)
 import os
 import subprocess
 
+import webview
+
 import config
 import obd_reader
 import web_server
 import display
+import bt_pan
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +152,39 @@ def _check_ota_pending():
     sys.exit(0)
 
 
+def _show_crash_screen(error):
+    """Show error on HDMI so the user doesn't just see a black screen."""
+    try:
+        import traceback
+        tb = traceback.format_exception(type(error), error, error.__traceback__)
+        short_tb = "".join(tb[-3:])  # Last 3 frames
+        html = display._build_error_html(
+            short_tb,
+            "SignalKit crashed. It will restart in a few seconds. "
+            "SSH in and run: journalctl -u signalkit -n 50"
+        )
+        win = webview.create_window(
+            "SignalKit Error",
+            html=html,
+            width=config.SCREEN_WIDTH,
+            height=config.SCREEN_HEIGHT,
+            fullscreen=config.FULLSCREEN,
+            frameless=True,
+        )
+        # Show for 8 seconds then let systemd restart kick in
+        import webview as _wv
+        def _auto_close():
+            time.sleep(8)
+            try:
+                win.destroy()
+            except Exception:
+                pass
+        threading.Thread(target=_auto_close, daemon=True).start()
+        _wv.start()
+    except Exception as e2:
+        logger.error(f"Failed to show crash screen: {e2}")
+
+
 def main():
     _check_ota_pending()
 
@@ -173,6 +209,13 @@ def main():
     obd_thread = start_obd_reader()
     web_thread = start_web_server()
 
+    # Start Bluetooth PAN manager if a phone is configured
+    pan_manager = None
+    if config.PHONE_BT_MAC and config.PHONE_BT_AUTO:
+        logger.info(f"Starting BT PAN manager for phone {config.PHONE_BT_MAC}")
+        pan_manager = bt_pan.BtPanManager(config.PHONE_BT_MAC)
+        pan_manager.start()
+
     # Brief startup pause — let OBD thread begin its connection attempt
     # and let the web server bind its port before the display renders
     time.sleep(1)
@@ -186,10 +229,17 @@ def main():
         logger.info("KeyboardInterrupt received")
     except Exception as e:
         logger.error(f"Display error: {e}", exc_info=True)
+        # Show the error on screen before systemd restarts us
+        _show_crash_screen(e)
 
     # --- Shutdown ---
     logger.info("Display exited — shutting down")
     _shutdown_event.set()
+
+    # Stop the BT PAN manager
+    if pan_manager:
+        pan_manager.stop()
+        logger.info("BT PAN manager stopped")
 
     # Stop the OBD reader cleanly
     obd_thread.stop()
