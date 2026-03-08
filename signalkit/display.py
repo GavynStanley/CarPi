@@ -883,6 +883,7 @@ def run_display():
         resizable=False,
         easy_drag=False,
         js_api=api,
+        background_color='#0a0a0a',
     )
 
     webview.start(debug=False)

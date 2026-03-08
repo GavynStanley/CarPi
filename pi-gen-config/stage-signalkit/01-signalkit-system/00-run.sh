@@ -46,7 +46,7 @@ echo "Removing unnecessary packages..."
 
 # Services/daemons we don't need (may or may not be present)
 apt-get remove -y --purge \
-    avahi-daemon triggerhappy rsyslog dphys-swapfile \
+    triggerhappy rsyslog dphys-swapfile \
     logrotate cron \
     2>/dev/null || true
 
@@ -76,7 +76,6 @@ EOF
 # ---------------------------------------------------------------------------
 on_chroot << 'EOF'
 for svc in \
-    avahi-daemon \
     triggerhappy \
     rsyslog \
     apt-daily \

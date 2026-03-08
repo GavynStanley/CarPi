@@ -170,6 +170,7 @@ def _show_crash_screen(error):
             height=config.SCREEN_HEIGHT,
             fullscreen=config.FULLSCREEN,
             frameless=True,
+            background_color='#0a0a0a',
         )
         # Show for 8 seconds then let systemd restart kick in
         import webview as _wv

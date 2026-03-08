@@ -1317,6 +1317,17 @@ SETUP_HTML = """<!DOCTYPE html>
         <h1 class="text-2xl font-bold mb-2">Welcome to SignalKit</h1>
         <p class="text-sm text-zinc-400 leading-relaxed">Let's set up your OBD2 dashboard. This takes about a minute.</p>
       </div>
+
+      <!-- Connected device greeting -->
+      <div id="connected-device" class="hidden bg-zinc-900 border border-zinc-800 rounded-xl p-3.5 mb-5 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.858 15.355-5.858 21.213 0"/></svg>
+        </div>
+        <div>
+          <div class="text-sm font-medium" id="device-name">Connected</div>
+          <div class="text-xs text-zinc-500">Connected to SignalKit WiFi</div>
+        </div>
+      </div>
       <div class="space-y-3 mb-8">
         <div class="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5">
           <div class="w-8 h-8 rounded-lg bg-acc/15 flex items-center justify-center shrink-0"><span class="text-sm font-bold text-acc">1</span></div>
@@ -1421,6 +1432,23 @@ SETUP_HTML = """<!DOCTYPE html>
       const step = document.querySelector('[data-step="' + n + '"]');
       if (step) step.classList.add('active');
     }
+
+    // Show the connected phone's name on the welcome screen
+    async function showConnectedDevice() {
+      try {
+        const resp = await fetch('/api/wifi-clients');
+        const data = await resp.json();
+        if (data.ok && data.clients.length > 0) {
+          // Find the client that's making this request (most likely the first/only one)
+          const client = data.clients.find(c => c.hostname) || data.clients[0];
+          const name = client.hostname || 'Unknown Device';
+          const el = document.getElementById('connected-device');
+          document.getElementById('device-name').textContent = name;
+          el.classList.remove('hidden');
+        }
+      } catch(e) {}
+    }
+    showConnectedDevice();
 
     async function setupBtScan() {
       const btn = document.getElementById('setup-scan-btn');
@@ -2106,11 +2134,20 @@ def _bt_scan_linux():
     # Ensure Bluetooth is unblocked and powered on
     subprocess.run(["rfkill", "unblock", "bluetooth"], capture_output=True, timeout=3)
     subprocess.run(["bluetoothctl", "power", "on"], capture_output=True, text=True, timeout=5)
-    # Start discovery scan
-    subprocess.run(["bluetoothctl", "scan", "on"], capture_output=True, text=True, timeout=2)
+    # Start discovery in background — bluetoothctl scan on blocks forever,
+    # so we launch it as a subprocess and let it run during the sleep
+    scan_proc = subprocess.Popen(
+        ["bluetoothctl", "--timeout", "8", "scan", "on"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
     time.sleep(8)
-    # Stop scan and list discovered devices
-    subprocess.run(["bluetoothctl", "scan", "off"], capture_output=True, text=True, timeout=3)
+    # Kill the scan process if still running
+    try:
+        scan_proc.terminate()
+        scan_proc.wait(timeout=2)
+    except Exception:
+        scan_proc.kill()
+    # List discovered devices
     proc = subprocess.run(
         ["bluetoothctl", "devices"], capture_output=True, text=True, timeout=5,
     )
@@ -2242,6 +2279,43 @@ def api_phone_status():
     status["phone_mac"] = mac
     status["auto_connect"] = bool(getattr(config, "PHONE_BT_AUTO", 0))
     return jsonify(status)
+
+
+@app.route("/api/wifi-clients", methods=["GET"])
+def api_wifi_clients():
+    """Return list of devices connected to the Pi's WiFi hotspot."""
+    clients = []
+    try:
+        # Read dnsmasq lease file for hostnames
+        leases = {}
+        lease_file = "/var/lib/misc/dnsmasq.leases"
+        if os.path.exists(lease_file):
+            with open(lease_file) as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 4:
+                        # format: timestamp mac ip hostname client-id
+                        leases[parts[1].lower()] = parts[3] if parts[3] != "*" else None
+
+        # Get connected stations from hostapd via iw
+        r = subprocess.run(
+            ["iw", "dev", "wlan0", "station", "dump"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            current_mac = None
+            for line in r.stdout.splitlines():
+                line = line.strip()
+                if line.startswith("Station"):
+                    current_mac = line.split()[1].lower()
+                    hostname = leases.get(current_mac)
+                    clients.append({
+                        "mac": current_mac,
+                        "hostname": hostname,
+                    })
+    except Exception as e:
+        logger.warning(f"Failed to get WiFi clients: {e}")
+    return jsonify({"ok": True, "clients": clients})
 
 
 @app.route("/api/restart", methods=["POST"])
