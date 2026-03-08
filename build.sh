@@ -196,6 +196,23 @@ fi
 # Build
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Patch pi-gen's unmount to use lazy unmount (prevents "target is busy" errors)
+# ---------------------------------------------------------------------------
+# pi-gen's on_chroot and stage scripts leave processes holding /proc, /sys, /dev
+# inside the chroot (e.g., from update-initramfs, dpkg triggers). The default
+# umount fails with "target is busy" and aborts the build. Lazy unmount (-l)
+# defers the actual unmount until references are released, avoiding the error.
+# This is a known pi-gen issue: https://github.com/RPi-Distro/pi-gen/issues/671
+
+PIGEN_COMMON="${PIGEN_DIR}/scripts/common"
+if [[ -f "${PIGEN_COMMON}" ]] && ! grep -q 'umount -l' "${PIGEN_COMMON}"; then
+    log "Patching pi-gen unmount to use lazy unmount (-l)"
+    # pi-gen uses: xargs -r umount
+    # Patch to:    xargs -r umount -l
+    sudo sed -i 's/xargs -r umount$/xargs -r umount -l/' "${PIGEN_COMMON}"
+fi
+
 step "Starting pi-gen build"
 log "This will take 20-60 minutes depending on your machine."
 log "Downloading Debian packages + building the full OS image."

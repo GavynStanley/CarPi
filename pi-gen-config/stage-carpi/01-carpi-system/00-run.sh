@@ -40,25 +40,80 @@ EOF
 # ---------------------------------------------------------------------------
 on_chroot << 'EOF'
 echo "Removing unnecessary packages..."
+
+# --- Round 1: Services and daemons we don't need ---
 apt-get remove -y --purge \
     avahi-daemon \
     triggerhappy \
     rsyslog \
     dphys-swapfile \
     logrotate \
-    man-db \
-    manpages \
+    cron \
     2>/dev/null || true
 
-# Pi Zero 2 W only needs the v7/v7l kernel.
-# Remove v6 (Pi 1/Zero 1) and v8 (64-bit) kernels to:
-#   - Skip initramfs rebuilds for unused kernels (~30-60 min saved under QEMU)
-#   - Save ~60MB in the final image
+# --- Round 2: Build tools (not needed at runtime) ---
+echo "Removing build toolchain..."
+apt-get remove -y --purge \
+    build-essential \
+    gcc gcc-12 g++ g++-12 cpp cpp-12 \
+    binutils binutils-arm-linux-gnueabihf binutils-common \
+    make dpkg-dev \
+    libc6-dev libc-dev-bin libc-devtools libcrypt-dev \
+    libgcc-12-dev libstdc++-12-dev \
+    libffi-dev libexpat1-dev libblkid-dev \
+    libglib2.0-dev libglib2.0-dev-bin \
+    fakeroot \
+    2>/dev/null || true
+
+# --- Round 3: Documentation and spell checkers ---
+echo "Removing docs, man pages, spell checkers..."
+apt-get remove -y --purge \
+    man-db manpages \
+    groff-base \
+    aspell aspell-en libaspell15 \
+    hunspell-en-us libhunspell-1.7-0 \
+    enchant-2 libenchant-2-2 \
+    dictionaries-common emacsen-common \
+    2>/dev/null || true
+
+# --- Round 4: Media/graphics processing (not needed for web dashboard) ---
+echo "Removing media processing libraries..."
+apt-get remove -y --purge \
+    ghostscript libgs10 libgs10-common libgs-common \
+    imagemagick-6-common \
+    gstreamer1.0-gl gstreamer1.0-libav \
+    gstreamer1.0-plugins-bad gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good gstreamer1.0-x \
+    libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+    libgstreamer-plugins-bad1.0-0 libgstreamer-gl1.0-0 \
+    libcamera-ipa libcamera0.5 \
+    libdjvulibre21 libdjvulibre-text \
+    2>/dev/null || true
+
+# --- Round 5: Unnecessary system tools ---
+echo "Removing unnecessary system tools..."
+apt-get remove -y --purge \
+    cifs-utils \
+    flashrom \
+    dmidecode \
+    device-tree-compiler \
+    2>/dev/null || true
+# Note: keeping dosfstools (SD card repair), fdisk, and perl (apt/dpkg depend on it)
+
+# --- Round 6: Firmware for hardware we don't have ---
+echo "Removing unused WiFi firmware (keeping brcm for Pi built-in WiFi)..."
+apt-get remove -y --purge \
+    firmware-atheros \
+    firmware-libertas \
+    firmware-mediatek \
+    firmware-realtek \
+    2>/dev/null || true
+
+# --- Round 7: Unused kernel variants ---
 echo "Installed kernel packages:"
 dpkg -l 'linux-image*' 2>/dev/null | grep '^ii' || true
 
 echo "Removing unused kernel variants (keeping v7 for Pi Zero 2 W)..."
-# Match actual Bookworm package names: linux-image-6.1.0-rpiN-rpi-v6, -v8
 REMOVE_PKGS=$(dpkg -l 'linux-image*' 2>/dev/null | grep '^ii' | awk '{print $2}' | grep -E '[-]v6|[-]v8' || true)
 if [ -n "$REMOVE_PKGS" ]; then
     echo "Removing: $REMOVE_PKGS"
@@ -67,9 +122,17 @@ else
     echo "No v6/v8 kernel packages found to remove"
 fi
 
+# --- Clean up ---
 apt-get autoremove -y --purge
 apt-get clean
 rm -rf /var/lib/apt/lists/*
+
+# Remove leftover docs and locale data
+rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
+rm -rf /usr/share/locale/* 2>/dev/null || true
+# Keep en_US locale
+mkdir -p /usr/share/locale/en_US
+
 echo "Package cleanup done"
 EOF
 
@@ -260,7 +323,7 @@ CMDLINE="${ROOTFS_DIR}/boot/cmdline.txt"
 
 # cmdline.txt is a single line — read it, strip newline, append our params
 EXISTING=$(cat "${CMDLINE}" | tr -d '\n')
-for PARAM in "quiet" "splash" "loglevel=3" "logo.nologo" "vt.global_cursor_default=0"; do
+for PARAM in "quiet" "splash" "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "systemd.show_status=false" "rd.systemd.show_status=false" "console=tty3"; do
     if ! echo "${EXISTING}" | grep -q "${PARAM}"; then
         EXISTING="${EXISTING} ${PARAM}"
     fi

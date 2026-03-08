@@ -43,9 +43,9 @@ else
         [[ -f "${REPO_ROOT}/VERSION" ]] && cp "${REPO_ROOT}/VERSION" "${CARPI_DEST}/"
         echo "Copied CarPi source from ${APP_SRC} -> ${CARPI_DEST}/carpi/"
     else
-        install -d "${CARPI_DEST}/carpi"
-        cp -r files/carpi/. "${CARPI_DEST}/carpi/"
-        echo "Copied CarPi source from stage files/ -> ${CARPI_DEST}/carpi/"
+        echo "ERROR: CarPi source not found at ${APP_SRC} and git clone failed."
+        echo "Cannot build image without application source."
+        exit 1
     fi
     echo "WARNING: OTA updates will not work without a git repo"
 fi
