@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-preview_web.py — Run the CarPi Flask web server with animated sample data.
+preview_web.py — Run the SignalKit Flask web server with animated sample data.
 
 No hardware required. Run from the repo root:
     python3 preview_web.py
@@ -15,7 +15,7 @@ import time
 import os
 
 # Point imports at the carpi/ source directory
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "carpi"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "signalkit"))
 
 import config
 config.FULLSCREEN = False
@@ -91,7 +91,7 @@ obd_reader.get_data = _sample_data
 # ── Run the Flask server ─────────────────────────────────────────────────────
 import web_server
 
-print(f"\n  CarPi Web Preview running at http://localhost:{config.WEB_PORT}")
+print(f"\n  SignalKit Web Preview running at http://localhost:{config.WEB_PORT}")
 print(f"  Press Ctrl+C to stop.\n")
 
 web_server.run_server()

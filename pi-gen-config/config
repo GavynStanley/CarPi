@@ -1,15 +1,15 @@
 # =============================================================================
-# pi-gen build configuration for CarPi OS
+# pi-gen build configuration for SignalKit OS
 # =============================================================================
 # This file is sourced by pi-gen's build.sh.
 # Reference: https://github.com/RPi-Distro/pi-gen
 #
-# Build produces a minimal Raspberry Pi OS Lite image with CarPi pre-installed.
+# Build produces a minimal Raspberry Pi OS Lite image with SignalKit pre-installed.
 # No desktop, no login prompt — boots directly into the dashboard.
 # =============================================================================
 
-# Image name — output will be: CarPi-YYYY-MM-DD.img
-IMG_NAME="CarPi"
+# Image name — output will be: SignalKit-YYYY-MM-DD.img
+IMG_NAME="SignalKit"
 
 # Debian release base. "bookworm" = Raspberry Pi OS 2023+ (current stable).
 RELEASE="bookworm"
@@ -25,9 +25,9 @@ KEYBOARD_KEYMAP="us"
 KEYBOARD_LAYOUT="English (US)"
 
 # --- User account ---
-# The single system user. CarPi runs as this user.
+# The single system user. SignalKit runs as this user.
 FIRST_USER_NAME="pi"
-FIRST_USER_PASS="carpi"      # Change this if you care about SSH security
+FIRST_USER_PASS="signalkit"      # Change this if you care about SSH security
 DISABLE_FIRST_BOOT_USER_RENAME=1
 
 # --- SSH ---
@@ -53,10 +53,10 @@ ENABLE_CLOUD_INIT=0
 # stage0 = bootstrap (base Debian)
 # stage1 = minimal Linux (no X, no GUI)
 # stage2 = Raspberry Pi OS Lite (network, Bluetooth, SSH base)
-# stage-carpi = our custom stage (CarPi app, hotspot, display)
+# stage-signalkit = our custom stage (SignalKit app, hotspot, display)
 #
 # We deliberately skip stages 3 (full desktop), 4 (recommended apps), 5 (extras).
-STAGE_LIST="stage0 stage1 stage2 stage-carpi export-image"
+STAGE_LIST="stage0 stage1 stage2 stage-signalkit export-image"
 
 # --- Export format ---
 # "lite" = compressed image only (no NOOBS format)

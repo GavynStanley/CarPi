@@ -5,7 +5,7 @@
 # The HTML is rendered locally with no network dependencies — data flows
 # through pywebview's JS-Python bridge (window.pywebview.api).
 #
-# Styling uses Tailwind CSS (play CDN) bundled locally in carpi/static/
+# Styling uses Tailwind CSS (play CDN) bundled locally in signalkit/static/
 # for fully offline operation.
 #
 # Requires: pywebview (pip install pywebview)
@@ -104,8 +104,8 @@ def _build_setup_html():
     theme = app_config.get_theme()
     accent = theme["accent"]
     glow = theme["glow"]
-    ssid = getattr(app_config, "HOTSPOT_SSID", "CarPi")
-    password = getattr(app_config, "HOTSPOT_PASSWORD", "carpi1234")
+    ssid = getattr(app_config, "HOTSPOT_SSID", "SignalKit")
+    password = getattr(app_config, "HOTSPOT_PASSWORD", "signalkit1234")
     ip = _get_local_ip()
     port = getattr(app_config, "WEB_PORT", 8080)
     return f"""<!DOCTYPE html>
@@ -116,14 +116,14 @@ def _build_setup_html():
 <script>
 tailwind.config = {{
   darkMode: 'class',
-  theme: {{ extend: {{ colors: {{ carpi: {{ bg: '#0a0a0f' }} }} }} }}
+  theme: {{ extend: {{ colors: {{ sk: {{ bg: '#0a0a0a' }} }} }} }}
 }};
 </script>
 <style>
   :root {{ --accent: {accent}; --accent-glow: {glow}; }}
   * {{ box-sizing: border-box; }}
   body {{
-    background: #0a0a0f; color: #f0f0f5;
+    background: #0a0a0a; color: #ffffff;
     width: 800px; height: 480px; overflow: hidden; cursor: none;
     margin: 0; padding: 0;
     font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
@@ -142,7 +142,7 @@ tailwind.config = {{
   }}
   .step-num {{
     width: 28px; height: 28px; border-radius: 50%;
-    background: var(--accent); color: #0a0a0f;
+    background: var(--accent); color: #0a0a0a;
     display: flex; align-items: center; justify-content: center;
     font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
     margin-top: 2px;
@@ -159,7 +159,7 @@ tailwind.config = {{
 <body>
 
 <div class="text-center mb-6">
-  <div class="text-3xl font-extrabold tracking-widest accent glow mb-1">CARPI</div>
+  <div class="text-3xl font-extrabold tracking-widest accent glow mb-1">SIGNALKIT</div>
   <div class="text-sm text-zinc-400">Setup Required</div>
 </div>
 
@@ -235,7 +235,7 @@ tailwind.config = {{
   theme: {{
     extend: {{
       colors: {{
-        carpi: {{ bg: '#0a0a0f', good: '#22c55e', warn: '#f59e0b', danger: '#ef4444' }}
+        sk: {{ bg: '#0a0a0a', good: '#22c55e', warn: '#f59e0b', danger: '#ef4444' }}
       }}
     }}
   }}
@@ -249,12 +249,12 @@ tailwind.config = {{
     }}
     * {{ box-sizing: border-box; }}
     body {{
-      background: #0a0a0f;
+      background: #0a0a0a;
       width: 800px; height: 480px;
       overflow: hidden; cursor: none;
       margin: 0; padding: 0;
       font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
-      color: #f0f0f5;
+      color: #ffffff;
       -webkit-font-smoothing: antialiased;
     }}
   }}
@@ -275,7 +275,7 @@ tailwind.config = {{
   /* --- Splash --- */
   #splash {{
     position: fixed; inset: 0; z-index: 1000;
-    background: #0a0a0f;
+    background: #0a0a0a;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     transition: opacity 0.8s ease-out;
@@ -393,7 +393,7 @@ tailwind.config = {{
 <div id="splash">
   <div class="splash-ring"></div>
   <div class="splash-dot"></div>
-  <div class="splash-title text-2xl font-extrabold tracking-widest" style="color:var(--accent)">CARPI</div>
+  <div class="splash-title text-2xl font-extrabold tracking-widest" style="color:var(--accent)">SIGNALKIT</div>
   <div class="splash-sub text-xs text-zinc-500 mt-1 tracking-wide">OBD2 Dashboard</div>
   <div class="splash-dots"><span></span><span></span><span></span></div>
 </div>
@@ -819,7 +819,7 @@ def run_display():
         html = _build_html()
 
     _window = webview.create_window(
-        "CarPi Dashboard",
+        "SignalKit Dashboard",
         html=html,
         width=app_config.SCREEN_WIDTH,
         height=app_config.SCREEN_HEIGHT,

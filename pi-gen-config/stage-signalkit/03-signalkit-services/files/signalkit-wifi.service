@@ -1,5 +1,5 @@
 [Unit]
-Description=CarPi WiFi hotspot configuration
+Description=SignalKit WiFi hotspot configuration
 Before=hostapd.service dnsmasq.service
 After=network-pre.target sys-subsystem-net-devices-wlan0.device
 Wants=sys-subsystem-net-devices-wlan0.device
@@ -14,11 +14,11 @@ ExecStartPre=/usr/sbin/rfkill unblock wifi
 ExecStartPre=/bin/sleep 1
 ExecStartPre=/sbin/ip link set wlan0 up
 ExecStartPre=/bin/bash -c '/sbin/ip addr show wlan0 | grep -q 192.168.4.1 || /sbin/ip addr add 192.168.4.1/24 dev wlan0'
-ExecStart=/opt/carpi/scripts/carpi-gen-hostapd.sh
+ExecStart=/opt/signalkit/scripts/signalkit-gen-hostapd.sh
 RemainAfterExit=yes
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=carpi-wifi
+SyslogIdentifier=signalkit-wifi
 
 [Install]
 WantedBy=multi-user.target

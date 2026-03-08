@@ -1,19 +1,19 @@
 [Unit]
-Description=CarPi OBD2 Dashboard
-Documentation=file:///opt/carpi/README.md
+Description=SignalKit OBD2 Dashboard
+Documentation=file:///opt/signalkit/README.md
 
 # Start after X11 is running, Bluetooth is ready, and rfcomm is bound
-After=network.target bluetooth.target carpi-rfcomm.service carpi-x11.service hostapd.service dnsmasq.service
+After=network.target bluetooth.target signalkit-rfcomm.service signalkit-x11.service hostapd.service dnsmasq.service
 Wants=bluetooth.target hostapd.service dnsmasq.service
-Requires=carpi-rfcomm.service carpi-x11.service
+Requires=signalkit-rfcomm.service signalkit-x11.service
 
 [Service]
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/opt/carpi/carpi
+WorkingDirectory=/opt/signalkit/signalkit
 
-ExecStart=/usr/bin/python3 /opt/carpi/carpi/main.py
+ExecStart=/usr/bin/python3 /opt/signalkit/signalkit/main.py
 
 # Restart on crash — critical for an always-on embedded device
 Restart=always
@@ -32,7 +32,7 @@ SupplementaryGroups=video bluetooth dialout render input
 TimeoutStopSec=10
 KillSignal=SIGTERM
 
-SyslogIdentifier=carpi
+SyslogIdentifier=signalkit
 
 [Install]
 WantedBy=multi-user.target

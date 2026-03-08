@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # =============================================================================
-# 05-carpi-fixperms/00-run.sh
+# 05-signalkit-fixperms/00-run.sh
 # =============================================================================
 # Fixes file ownership and permissions across the rootfs.
 #
@@ -18,7 +18,7 @@
 # so all filesystem operations work correctly regardless of emulation bugs.
 # =============================================================================
 
-echo "==> [05-carpi-fixperms] Fixing file ownership and permissions"
+echo "==> [05-signalkit-fixperms] Fixing file ownership and permissions"
 
 # ---------------------------------------------------------------------------
 # 1. Reset system directories to root:root ownership
@@ -41,11 +41,11 @@ if [[ -d "${ROOTFS_DIR}/home/pi" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# 3. Restore CarPi application ownership (runs as pi user)
+# 3. Restore SignalKit application ownership (runs as pi user)
 # ---------------------------------------------------------------------------
-if [[ -d "${ROOTFS_DIR}/opt/carpi" ]]; then
-    chown -R 1000:1000 "${ROOTFS_DIR}/opt/carpi"
-    echo "CarPi app /opt/carpi set to pi:pi (1000:1000)"
+if [[ -d "${ROOTFS_DIR}/opt/signalkit" ]]; then
+    chown -R 1000:1000 "${ROOTFS_DIR}/opt/signalkit"
+    echo "SignalKit app /opt/signalkit set to pi:pi (1000:1000)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -116,9 +116,9 @@ chown root:shadow "${ROOTFS_DIR}/etc/shadow" 2>/dev/null || true
 chmod 640 "${ROOTFS_DIR}/etc/gshadow" 2>/dev/null || true
 chown root:shadow "${ROOTFS_DIR}/etc/gshadow" 2>/dev/null || true
 
-# /var/log/carpi owned by pi
-if [[ -d "${ROOTFS_DIR}/var/log/carpi" ]]; then
-    chown 1000:1000 "${ROOTFS_DIR}/var/log/carpi"
+# /var/log/signalkit owned by pi
+if [[ -d "${ROOTFS_DIR}/var/log/signalkit" ]]; then
+    chown 1000:1000 "${ROOTFS_DIR}/var/log/signalkit"
 fi
 
-echo "==> [05-carpi-fixperms] Permissions fixed"
+echo "==> [05-signalkit-fixperms] Permissions fixed"

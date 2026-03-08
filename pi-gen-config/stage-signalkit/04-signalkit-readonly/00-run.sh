@@ -1,6 +1,6 @@
 #!/bin/bash -e
 # =============================================================================
-# 04-carpi-readonly/00-run.sh
+# 04-signalkit-readonly/00-run.sh
 # =============================================================================
 # Configures a read-only root filesystem using overlayfs.
 #
@@ -23,7 +23,7 @@
 #     2. Sets up the boot-time overlayfs mount via init
 # =============================================================================
 
-echo "==> [04-carpi-readonly] Configuring read-only filesystem (overlayfs)"
+echo "==> [04-signalkit-readonly] Configuring read-only filesystem (overlayfs)"
 
 # ---------------------------------------------------------------------------
 # 1. Enable overlayfs via systemd.volatile kernel parameter
@@ -67,7 +67,7 @@ fi
 
 cat >> "${ROOTFS_DIR}/etc/fstab" << 'FSTAB'
 
-# CarPi: tmpfs mounts for read-only root compatibility
+# SignalKit: tmpfs mounts for read-only root compatibility
 # These directories need to be writable at runtime.
 tmpfs   /tmp        tmpfs   defaults,noatime,nosuid,size=64m    0 0
 tmpfs   /var/tmp    tmpfs   defaults,noatime,nosuid,size=32m    0 0
@@ -80,10 +80,10 @@ FSTAB
 # With a read-only root, systemd-journald can't write to /var/log/journal
 # on disk. Configure it to use volatile (RAM) storage instead.
 install -d "${ROOTFS_DIR}/etc/systemd/journald.conf.d"
-cat > "${ROOTFS_DIR}/etc/systemd/journald.conf.d/carpi-volatile.conf" << 'EOF'
+cat > "${ROOTFS_DIR}/etc/systemd/journald.conf.d/signalkit-volatile.conf" << 'EOF'
 [Journal]
 # Store logs in RAM — lost on reboot, but that's acceptable for an embedded device.
-# Increase RateLimitBurst to avoid dropping CarPi log messages.
+# Increase RateLimitBurst to avoid dropping SignalKit log messages.
 Storage=volatile
 RuntimeMaxUse=16M
 RateLimitInterval=30s
@@ -118,7 +118,7 @@ EOF
 # systemctl enable ssh-keygen.service
 # EOF
 
-echo "==> [04-carpi-readonly] Read-only filesystem configured"
+echo "==> [04-signalkit-readonly] Read-only filesystem configured"
 echo ""
 echo "NOTE: The overlayfs is enabled. After flashing the image:"
 echo "  - ALL changes made at runtime (file edits, etc.) are lost on reboot"

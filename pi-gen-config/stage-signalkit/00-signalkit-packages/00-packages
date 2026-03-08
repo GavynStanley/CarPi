@@ -1,5 +1,5 @@
 # =============================================================================
-# 00-packages — Additional packages for CarPi
+# 00-packages — Additional packages for SignalKit
 # =============================================================================
 # pi-gen reads this file and runs: apt-get install -y <each line>
 # Base packages (bluez, curl, sudo, ssh, etc.) are already in pi-gen/stage2.
@@ -11,7 +11,7 @@ bluetooth
 bluez-tools
 
 # --- WiFi hotspot ---
-# hostapd and dnsmasq are installed in 01-carpi-system/00-run.sh instead,
+# hostapd and dnsmasq are installed in 01-signalkit-system/00-run.sh instead,
 # using DEBIAN_FRONTEND=noninteractive to suppress dpkg conffile prompts.
 
 # --- Boot splash ---

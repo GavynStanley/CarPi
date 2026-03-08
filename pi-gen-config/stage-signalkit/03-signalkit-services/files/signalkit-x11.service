@@ -1,0 +1,41 @@
+[Unit]
+Description=SignalKit X11 Display Server
+Documentation=file:///opt/signalkit/README.md
+After=systemd-user-sessions.service plymouth-quit.service
+Wants=plymouth-quit.service
+
+# Only start if there's a display device
+ConditionPathExists=/dev/fb0
+
+[Service]
+Type=simple
+# X must run as root to open /dev/tty1 and the GPU device nodes.
+# It drops privileges internally. Clients (pywebview) connect over the
+# X socket as the pi user — no root access is granted to them.
+
+# Start a minimal X server on vt1 with no access control
+# -nocursor hides the mouse cursor (touchscreen/no-mouse kiosk)
+# -ac disables host-based access control so the pi user can connect
+ExecStart=/usr/bin/X :0 -nolisten tcp -nocursor -ac vt1
+# Set root window to black immediately (no white flash while app loads)
+# The - prefix makes these non-fatal (X may not be fully ready yet)
+ExecStartPost=-/usr/bin/xsetroot -display :0 -solid black
+# Disable DPMS and screen blanking — kiosk display must stay on permanently
+ExecStartPost=-/usr/bin/xset -display :0 s off
+ExecStartPost=-/usr/bin/xset -display :0 -dpms
+ExecStartPost=-/usr/bin/xset -display :0 s noblank
+Restart=always
+RestartSec=3
+
+# Allow X to access the TTY
+StandardInput=tty
+StandardOutput=null
+StandardError=journal
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+
+SyslogIdentifier=signalkit-x11
+
+[Install]
+WantedBy=multi-user.target

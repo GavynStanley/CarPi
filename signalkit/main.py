@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # =============================================================================
-# main.py - CarPi Entry Point
+# main.py - SignalKit Entry Point
 # =============================================================================
 # Starts all subsystems in the correct order:
 #   1. Logging setup
@@ -32,7 +32,7 @@ logging.basicConfig(
     handlers=[
         logging.StreamHandler(sys.stdout),
         # Optionally log to file — useful for debugging boot issues:
-        # logging.FileHandler("/var/log/carpi.log"),
+        # logging.FileHandler("/var/log/signalkit.log"),
     ]
 )
 logger = logging.getLogger("main")
@@ -153,7 +153,7 @@ def main():
     _check_ota_pending()
 
     logger.info("=" * 60)
-    logger.info("CarPi Dashboard Starting")
+    logger.info("SignalKit Dashboard Starting")
     logger.info(f"  Screen:     {config.SCREEN_WIDTH}x{config.SCREEN_HEIGHT}")
     logger.info(f"  OBD2 MAC:   {config.OBD_MAC}")
     logger.info(f"  Web server: http://{config.HOTSPOT_IP}:{config.WEB_PORT}")
@@ -197,7 +197,7 @@ def main():
     logger.info("OBD reader stopped")
 
     # Web thread is a daemon — it exits automatically
-    logger.info("CarPi shutdown complete")
+    logger.info("SignalKit shutdown complete")
     sys.exit(0)
 
 

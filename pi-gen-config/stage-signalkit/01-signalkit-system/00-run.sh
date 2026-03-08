@@ -1,13 +1,13 @@
 #!/bin/bash -e
 # =============================================================================
-# 01-carpi-system/00-run.sh
+# 01-signalkit-system/00-run.sh
 # =============================================================================
 # Runs during image build (in chroot) to configure the system layer:
 #   - Remove unnecessary packages (fast boot)
 #   - Configure Bluetooth (auto-enable, pairing policy)
 #   - Configure WiFi hotspot (hostapd + dnsmasq + static IP)
 #   - Configure HDMI display output
-#   - Disable login prompt (autologin to pi user, then systemd starts CarPi)
+#   - Disable login prompt (autologin to pi user, then systemd starts SignalKit)
 #   - Tune boot parameters for speed
 #
 # pi-gen context: ${ROOTFS_DIR} is the target filesystem root.
@@ -17,7 +17,7 @@
 # on_chroot is provided by pi-gen's common.sh (sourced by the build system)
 # ROOTFS_DIR, STAGE_DIR are also provided by the build environment.
 
-echo "==> [01-carpi-system] Configuring CarPi system layer"
+echo "==> [01-signalkit-system] Configuring SignalKit system layer"
 
 # ---------------------------------------------------------------------------
 # 0. Install packages that have interactive conffile prompts
@@ -93,10 +93,10 @@ systemctl disable getty@tty1 2>/dev/null || true
 EOF
 
 # ---------------------------------------------------------------------------
-# 4. Autologin as 'pi' on tty1 (systemd then starts CarPi)
+# 4. Autologin as 'pi' on tty1 (systemd then starts SignalKit)
 # ---------------------------------------------------------------------------
-# We configure autologin so that if CarPi crashes, the user gets a shell.
-# The carpi.service starts independently of this.
+# We configure autologin so that if SignalKit crashes, the user gets a shell.
+# The signalkit.service starts independently of this.
 install -d "${ROOTFS_DIR}/etc/systemd/system/getty@tty1.service.d"
 cat > "${ROOTFS_DIR}/etc/systemd/system/getty@tty1.service.d/autologin.conf" << 'EOF'
 [Service]
@@ -131,19 +131,19 @@ EOF
 
 # (a) Tell NetworkManager to ignore wlan0
 install -d "${ROOTFS_DIR}/etc/NetworkManager/conf.d"
-cat > "${ROOTFS_DIR}/etc/NetworkManager/conf.d/99-carpi-unmanaged.conf" << 'EOF'
+cat > "${ROOTFS_DIR}/etc/NetworkManager/conf.d/99-signalkit-unmanaged.conf" << 'EOF'
 [keyfile]
 unmanaged-devices=interface-name:wlan0
 EOF
 
-# (b) Static IP — assigned by carpi-wifi.service before hostapd starts
+# (b) Static IP — assigned by signalkit-wifi.service before hostapd starts
 # (using `ip addr add` in the service, no systemd-networkd needed)
 
 # (b-fallback) Also write dhcpcd.conf in case this is a Bullseye-based build
 if [[ -f "${ROOTFS_DIR}/etc/dhcpcd.conf" ]]; then
     cat >> "${ROOTFS_DIR}/etc/dhcpcd.conf" << 'EOF'
 
-# CarPi hotspot: static IP on wlan0, no DHCP client (we ARE the DHCP server)
+# SignalKit hotspot: static IP on wlan0, no DHCP client (we ARE the DHCP server)
 interface wlan0
     static ip_address=192.168.4.1/24
     nohook wpa_supplicant
@@ -176,12 +176,12 @@ systemctl enable hostapd
 systemctl enable dnsmasq
 EOF
 
-# Override hostapd to wait for carpi-wifi (interface + IP must be ready)
+# Override hostapd to wait for signalkit-wifi (interface + IP must be ready)
 install -d "${ROOTFS_DIR}/etc/systemd/system/hostapd.service.d"
 cat > "${ROOTFS_DIR}/etc/systemd/system/hostapd.service.d/wait-for-wifi.conf" << 'EOF'
 [Unit]
-Requires=carpi-wifi.service
-After=carpi-wifi.service
+Requires=signalkit-wifi.service
+After=signalkit-wifi.service
 EOF
 
 # ---------------------------------------------------------------------------
@@ -192,11 +192,11 @@ BOOT_CONFIG="${ROOTFS_DIR}/boot/config.txt"
 [[ -f "${ROOTFS_DIR}/boot/firmware/config.txt" ]] && \
     BOOT_CONFIG="${ROOTFS_DIR}/boot/firmware/config.txt"
 
-# Append CarPi display config to the boot config
+# Append SignalKit display config to the boot config
 cat >> "${BOOT_CONFIG}" << 'EOF'
 
 # =============================================================================
-# CarPi Display Configuration
+# SignalKit Display Configuration
 # =============================================================================
 # Force HDMI on even if no monitor is detected at boot
 hdmi_force_hotplug=1
@@ -225,24 +225,24 @@ dtoverlay=dwc2
 EOF
 
 # ---------------------------------------------------------------------------
-# 8. Plymouth boot splash — CarPi branded theme
+# 8. Plymouth boot splash — SignalKit branded theme
 # ---------------------------------------------------------------------------
-# Install the custom CarPi Plymouth theme
-install -d "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi"
-install -m 644 files/plymouth-carpi/carpi.plymouth \
-    "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi/carpi.plymouth"
-install -m 644 files/plymouth-carpi/carpi.script \
-    "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi/carpi.script"
-install -m 644 files/plymouth-carpi/logo.png \
-    "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi/logo.png"
-install -m 644 files/plymouth-carpi/dot.png \
-    "${ROOTFS_DIR}/usr/share/plymouth/themes/carpi/dot.png"
+# Install the custom SignalKit Plymouth theme
+install -d "${ROOTFS_DIR}/usr/share/plymouth/themes/signalkit"
+install -m 644 files/plymouth-signalkit/signalkit.plymouth \
+    "${ROOTFS_DIR}/usr/share/plymouth/themes/signalkit/signalkit.plymouth"
+install -m 644 files/plymouth-signalkit/signalkit.script \
+    "${ROOTFS_DIR}/usr/share/plymouth/themes/signalkit/signalkit.script"
+install -m 644 files/plymouth-signalkit/logo.png \
+    "${ROOTFS_DIR}/usr/share/plymouth/themes/signalkit/logo.png"
+install -m 644 files/plymouth-signalkit/dot.png \
+    "${ROOTFS_DIR}/usr/share/plymouth/themes/signalkit/dot.png"
 
-# Set CarPi as the default Plymouth theme
+# Set SignalKit as the default Plymouth theme
 # NOTE: We do NOT run update-initramfs here — export-image/05-finalise does it
 # automatically. Running it twice doubles the build time under QEMU emulation.
 on_chroot << 'EOF'
-plymouth-set-default-theme carpi
+plymouth-set-default-theme signalkit
 EOF
 
 # ---------------------------------------------------------------------------
@@ -267,9 +267,9 @@ echo "${EXISTING}" > "${CMDLINE}"
 # ---------------------------------------------------------------------------
 # 10. Hostname
 # ---------------------------------------------------------------------------
-echo "carpi" > "${ROOTFS_DIR}/etc/hostname"
+echo "signalkit" > "${ROOTFS_DIR}/etc/hostname"
 # Update /etc/hosts to match
-sed -i "s/raspberrypi/carpi/g" "${ROOTFS_DIR}/etc/hosts" 2>/dev/null || true
+sed -i "s/raspberrypi/signalkit/g" "${ROOTFS_DIR}/etc/hosts" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
 # 11. USB gadget networking — static IP on usb0
@@ -319,10 +319,10 @@ EOF
 # ---------------------------------------------------------------------------
 cat >> "${ROOTFS_DIR}/home/pi/.bashrc" << 'EOF'
 
-# CarPi: Kivy uses SDL2 with DRM/KMS backend (no X11 desktop)
+# SignalKit: Kivy uses SDL2 with DRM/KMS backend (no X11 desktop)
 export KIVY_BCM_DISPMANX_ID=2
 EOF
 
 # Same for the service environment — done in the service file itself
 
-echo "==> [01-carpi-system] System configuration complete"
+echo "==> [01-signalkit-system] System configuration complete"

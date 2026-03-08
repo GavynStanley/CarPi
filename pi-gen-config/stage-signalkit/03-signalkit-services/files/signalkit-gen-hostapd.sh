@@ -1,8 +1,8 @@
 #!/bin/bash
 # =============================================================================
-# carpi-gen-hostapd.sh — Generate hostapd.conf from CarPi config.py
+# signalkit-gen-hostapd.sh — Generate hostapd.conf from SignalKit config.py
 # =============================================================================
-# Called by carpi-wifi.service on each boot to regenerate hostapd.conf
+# Called by signalkit-wifi.service on each boot to regenerate hostapd.conf
 # from the SSID/password in config.py. This allows users to change WiFi
 # settings by editing config.py without touching hostapd.conf directly.
 # =============================================================================
@@ -12,21 +12,21 @@ CONF="/etc/hostapd/hostapd.conf"
 # Read SSID and password from config.py
 SSID=$(python3 -c "
 import sys
-sys.path.insert(0, '/opt/carpi/carpi')
+sys.path.insert(0, '/opt/signalkit/signalkit')
 import config
 print(config.HOTSPOT_SSID)
 " 2>/dev/null)
 
 PASS=$(python3 -c "
 import sys
-sys.path.insert(0, '/opt/carpi/carpi')
+sys.path.insert(0, '/opt/signalkit/signalkit')
 import config
 print(config.HOTSPOT_PASSWORD)
 " 2>/dev/null)
 
 # Fall back to defaults if config.py is missing or broken
-SSID="${SSID:-CarPi}"
-PASS="${PASS:-carpi1234}"
+SSID="${SSID:-SignalKit}"
+PASS="${PASS:-signalkit1234}"
 
 # Write hostapd.conf
 cat > "$CONF" << EOF

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# build.sh — CarPi OS Image Builder
+# build.sh — SignalKit OS Image Builder
 # =============================================================================
 # Builds a flashable .img file using a vendored copy of pi-gen (in ./pi-gen/).
 # No internet clone step — pi-gen is part of this repo with trimmed packages.
@@ -17,7 +17,7 @@
 #   ./build.sh --docker     # Docker-based build (works on macOS too)
 #   ./build.sh --clean      # Clean previous build artifacts first
 #
-# Output: deploy/CarPi-YYYY-MM-DD.img.zip
+# Output: deploy/SignalKit-YYYY-MM-DD.img.zip
 # =============================================================================
 
 set -e
@@ -25,7 +25,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIGEN_DIR="${SCRIPT_DIR}/pi-gen"
 CONFIG="${SCRIPT_DIR}/pi-gen-config/config"
-STAGE_DIR="${SCRIPT_DIR}/pi-gen-config/stage-carpi"
+STAGE_DIR="${SCRIPT_DIR}/pi-gen-config/stage-signalkit"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 log()  { echo -e "${GREEN}[build]${NC} $*"; }
@@ -35,19 +35,19 @@ step() { echo -e "\n${BLUE}==> $*${NC}"; }
 
 USE_DOCKER=0
 CLEAN=0
-CLEAN_CARPI=0
+CLEAN_SIGNALKIT=0
 
 # Parse arguments
 for arg in "$@"; do
     case "$arg" in
-        --docker)      USE_DOCKER=1 ;;
-        --clean)       CLEAN=1 ;;
-        --clean-carpi) CLEAN_CARPI=1 ;;
+        --docker)          USE_DOCKER=1 ;;
+        --clean)           CLEAN=1 ;;
+        --clean-signalkit) CLEAN_SIGNALKIT=1 ;;
         --help|-h)
-            echo "Usage: $0 [--docker] [--clean] [--clean-carpi]"
-            echo "  --docker       Build inside Docker (required on macOS/Windows)"
-            echo "  --clean        Remove ALL build artifacts (full rebuild)"
-            echo "  --clean-carpi  Re-run only stage-carpi (keeps stages 0-2 cached)"
+            echo "Usage: $0 [--docker] [--clean] [--clean-signalkit]"
+            echo "  --docker           Build inside Docker (required on macOS/Windows)"
+            echo "  --clean            Remove ALL build artifacts (full rebuild)"
+            echo "  --clean-signalkit  Re-run only stage-signalkit (keeps stages 0-2 cached)"
             exit 0
             ;;
         *) err "Unknown argument: $arg" ;;
@@ -67,19 +67,19 @@ step "Pre-flight checks"
 # Check config file exists
 [[ -f "${CONFIG}" ]] || err "Config not found: ${CONFIG}"
 
-# Check CarPi source exists
-CARPI_SRC="${SCRIPT_DIR}/carpi"
-[[ -d "${CARPI_SRC}" ]] || err "CarPi source not found: ${CARPI_SRC}"
+# Check SignalKit source exists
+SIGNALKIT_SRC="${SCRIPT_DIR}/signalkit"
+[[ -d "${SIGNALKIT_SRC}" ]] || err "SignalKit source not found: ${SIGNALKIT_SRC}"
 
 # Check OBD_MAC is set (not the placeholder)
-OBD_MAC=$(grep "^OBD_MAC" "${CARPI_SRC}/config.py" | cut -d'"' -f2)
+OBD_MAC=$(grep "^OBD_MAC" "${SIGNALKIT_SRC}/config.py" | cut -d'"' -f2)
 if [[ "${OBD_MAC}" == "AA:BB:CC:DD:EE:FF" ]]; then
     warn "============================================================"
-    warn "OBD_MAC in carpi/config.py is still the placeholder value!"
+    warn "OBD_MAC in signalkit/config.py is still the placeholder value!"
     warn "The image will build, but OBD2 connection won't work until"
     warn "you set the correct MAC address."
     warn "Either:"
-    warn "  1. Edit carpi/config.py now, then rebuild"
+    warn "  1. Edit signalkit/config.py now, then rebuild"
     warn "  2. Or set it after flashing (requires disabling overlayfs)"
     warn "============================================================"
     sleep 3
@@ -106,14 +106,14 @@ log "All pre-flight checks passed"
 
 step "Linking custom stage"
 
-PIGEN_STAGE_LINK="${PIGEN_DIR}/stage-carpi"
+PIGEN_STAGE_LINK="${PIGEN_DIR}/stage-signalkit"
 
 if [[ ${USE_DOCKER} -eq 1 ]]; then
     # Docker build: copy files so Docker COPY picks them up
     sudo rm -rf "${PIGEN_STAGE_LINK}"
     sudo cp -r "${STAGE_DIR}" "${PIGEN_STAGE_LINK}"
     sudo cp "${CONFIG}" "${PIGEN_DIR}/config"
-    log "Copied stage-carpi and config into pi-gen (Docker build)"
+    log "Copied stage-signalkit and config into pi-gen (Docker build)"
 else
     # Native build: symlink is fine
     if [[ -L "${PIGEN_STAGE_LINK}" ]]; then
@@ -146,12 +146,12 @@ if [[ ${CLEAN} -eq 1 ]]; then
     step "Cleaning ALL build artifacts (full rebuild)"
     sudo rm -rf "${PIGEN_DIR}/work" "${PIGEN_DIR}/deploy"
     log "Cleaned"
-elif [[ ${CLEAN_CARPI} -eq 1 ]]; then
-    step "Cleaning stage-carpi only (stages 0-2 cached)"
-    sudo rm -f "${PIGEN_DIR}/work/stage-carpi/SKIP"
+elif [[ ${CLEAN_SIGNALKIT} -eq 1 ]]; then
+    step "Cleaning stage-signalkit only (stages 0-2 cached)"
+    sudo rm -f "${PIGEN_DIR}/work/stage-signalkit/SKIP"
     sudo rm -f "${PIGEN_DIR}/work/export-image/SKIP"
     sudo rm -rf "${PIGEN_DIR}/deploy"
-    log "Removed stage-carpi + export-image SKIP markers — both will re-run"
+    log "Removed stage-signalkit + export-image SKIP markers — both will re-run"
 fi
 
 # ---------------------------------------------------------------------------
@@ -267,12 +267,12 @@ echo "  1. Flash the image to a microSD card:"
 echo "     Using Raspberry Pi Imager:"
 echo "       Open Imager -> Choose OS -> Use Custom -> select the .img.zip"
 echo "     Or using dd (Linux):"
-echo "       unzip -p deploy/CarPi-*.img.zip | sudo dd of=/dev/sdX bs=4M status=progress"
+echo "       unzip -p deploy/SignalKit-*.img.zip | sudo dd of=/dev/sdX bs=4M status=progress"
 echo ""
 echo "  2. Insert SD card into Pi Zero 2 W and power on."
 echo "     Dashboard appears in ~15 seconds."
 echo ""
-echo "  3. Connect to 'CarPi' WiFi (password: carpi1234) and open http://192.168.4.1:8080"
+echo "  3. Connect to 'SignalKit' WiFi (password: signalkit1234) and open http://192.168.4.1:8080"
 echo ""
 if [[ "${OBD_MAC}" == "AA:BB:CC:DD:EE:FF" ]]; then
     echo -e "  ${YELLOW}4. Set your OBD2 MAC address:${NC}"
@@ -280,7 +280,7 @@ if [[ "${OBD_MAC}" == "AA:BB:CC:DD:EE:FF" ]]; then
     echo "     To fix without rebuilding:"
     echo "       a. SSH into Pi (enable SSH first via raspi-config)"
     echo "       b. sudo raspi-config -> Advanced -> Overlay FS -> Disable"
-    echo "       c. nano /opt/carpi/config.py  (set OBD_MAC)"
+    echo "       c. nano /opt/signalkit/config.py  (set OBD_MAC)"
     echo "       d. sudo raspi-config -> Advanced -> Overlay FS -> Enable"
     echo "       e. sudo reboot"
     echo ""

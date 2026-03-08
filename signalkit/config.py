@@ -1,5 +1,5 @@
 # =============================================================================
-# config.py - CarPi Configuration
+# config.py - SignalKit Configuration
 # =============================================================================
 # Edit this file to set hardware defaults before building the image.
 # The most important setting is OBD_MAC — set it to your Veepeak adapter's
@@ -7,7 +7,7 @@
 #
 # Runtime overrides:
 #   Settings changed via the web UI (http://192.168.4.1:5000/settings) are
-#   saved to /boot/carpi-config.json — the FAT32 boot partition, which is
+#   saved to /boot/signalkit-config.json — the FAT32 boot partition, which is
 #   always writable on Raspberry Pi even with the read-only overlayfs root.
 #   Those overrides are loaded here at startup and win over the defaults below.
 # =============================================================================
@@ -36,9 +36,9 @@ _on_setting_changed = None
 # Tries the newer Pi OS path first (/boot/firmware), then legacy (/boot),
 # then a local fallback for development on non-Pi machines.
 _OVERRIDE_PATHS = [
-    "/boot/firmware/carpi-config.json",
-    "/boot/carpi-config.json",
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "carpi-config.json"),
+    "/boot/firmware/signalkit-config.json",
+    "/boot/signalkit-config.json",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "signalkit-config.json"),
 ]
 
 # Resolved path actually in use — set by load_overrides()
@@ -57,8 +57,8 @@ OBD_RECONNECT_DELAY = 5          # Seconds to wait before retrying after disconn
 OBD_BT_CHANNEL = 1               # RFCOMM channel (most ELM327 adapters use 1)
 
 # --- WiFi Hotspot ---
-HOTSPOT_SSID = "CarPi"
-HOTSPOT_PASSWORD = "carpi1234"   # Default WiFi password (change in setup wizard or settings)
+HOTSPOT_SSID = "SignalKit"
+HOTSPOT_PASSWORD = "signalkit1234"   # Default WiFi password (change in setup wizard or settings)
 HOTSPOT_IP = "192.168.4.1"
 HOTSPOT_INTERFACE = "wlan0"
 
@@ -77,13 +77,13 @@ FULLSCREEN = True                # Set False for windowed/debug mode
 TIME_24HR = True                 # True = 24-hour clock, False = 12-hour with AM/PM
 UNITS_SPEED = "mph"              # "mph" or "kmh"
 UNITS_TEMP = "C"                 # "C" (Celsius) or "F" (Fahrenheit)
-COLOR_THEME = "blue"             # Accent color theme
+COLOR_THEME = "red"              # Accent color theme
 SHOW_SPARKLINES = 1              # 1 = show sparkline graphs, 0 = hide
 
 # --- Theme Presets ---
 THEMES = {
     "blue":   {"accent": "#3b82f6", "glow": "#3b82f680"},
-    "red":    {"accent": "#ef4444", "glow": "#ef444480"},
+    "red":    {"accent": "#DC2626", "glow": "#DC262680"},
     "green":  {"accent": "#22c55e", "glow": "#22c55e80"},
     "purple": {"accent": "#a855f7", "glow": "#a855f780"},
     "orange": {"accent": "#f97316", "glow": "#f9731680"},
@@ -92,8 +92,8 @@ THEMES = {
 }
 
 def get_theme() -> dict:
-    """Return the active theme dict. Falls back to blue."""
-    return THEMES.get(COLOR_THEME, THEMES["blue"])
+    """Return the active theme dict. Falls back to red."""
+    return THEMES.get(COLOR_THEME, THEMES["red"])
 
 # --- Dashboard Layout ---
 # Cards to show in the metrics row (up to 4) and slow row (up to 3).
@@ -119,21 +119,21 @@ KIA_OIL_TEMP_OFFSET = -48
 
 # --- Colors (RGB tuples) ---
 # Matches the web UI's modern dark theme
-COLOR_BG = (10, 10, 15)             # --bg: #0a0a0f
-COLOR_PANEL = (18, 18, 28)
-COLOR_CARD = (22, 22, 32)           # --surface with slight opacity
-COLOR_BORDER = (45, 45, 62)         # --border: subtle
-COLOR_TEXT_PRIMARY = (240, 240, 245) # --text: #f0f0f5
-COLOR_TEXT_SECONDARY = (140, 140, 165) # --text-dim
-COLOR_TEXT_DIM = (90, 90, 115)       # --text-muted
-COLOR_ACCENT = (59, 130, 246)        # --accent: #3b82f6
+COLOR_BG = (10, 10, 10)             # --bg: #0a0a0a
+COLOR_PANEL = (14, 14, 14)          # --surface: #0e0e0e
+COLOR_CARD = (14, 14, 14)           # --surface: #0e0e0e
+COLOR_BORDER = (40, 10, 10)         # --border: red-tinted
+COLOR_TEXT_PRIMARY = (255, 255, 255) # --text: #ffffff
+COLOR_TEXT_SECONDARY = (140, 140, 140) # --text-dim: rgba(255,255,255,0.55)
+COLOR_TEXT_DIM = (77, 77, 77)        # --text-muted: rgba(255,255,255,0.30)
+COLOR_ACCENT = (220, 38, 38)        # --accent: #DC2626 (Signal Red)
 COLOR_GOOD = (34, 197, 94)           # --good: #22c55e
 COLOR_WARNING = (250, 176, 5)        # --warn: #fab005
 COLOR_DANGER = (239, 68, 68)         # --danger: #ef4444
 COLOR_DTC = (248, 113, 113)          # lighter red for DTC text
-COLOR_RPM_BAR = (59, 130, 246)       # matches accent blue
+COLOR_RPM_BAR = (220, 38, 38)        # matches accent red
 COLOR_RPM_RED = (239, 68, 68)
-COLOR_GAUGE_BG = (30, 30, 42)        # subtle arc background
+COLOR_GAUGE_BG = (20, 20, 20)        # subtle arc background
 
 # ---------------------------------------------------------------------------
 # Editable settings registry
@@ -145,7 +145,7 @@ COLOR_GAUGE_BG = (30, 30, 42)        # subtle arc background
 #   label       — human-readable name shown in the settings form
 #   type        — "str", "int", or "float" — used for casting and input type
 #   min / max   — (numeric only) valid range; form enforces these limits
-#   restart     — True if a CarPi restart is needed for the change to take effect
+#   restart     — True if a SignalKit restart is needed for the change to take effect
 #   description — hint text shown below the input field
 
 EDITABLE_SETTINGS = {
@@ -420,7 +420,7 @@ def save_setting(key, raw_value):
         _logger.debug("No display callback registered")
 
     if meta.get("restart"):
-        return True, "Saved — restart CarPi for this change to take effect"
+        return True, "Saved — restart SignalKit for this change to take effect"
     return True, "Saved"
 
 

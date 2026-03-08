@@ -25,13 +25,13 @@ logs.txt
 *.log
 
 # Runtime config overrides (user-specific settings)
-carpi_overrides.json
-carpi-config.json
+signalkit_overrides.json
+signalkit-config.json
 
 # pi-gen build artifacts (vendored pi-gen source is tracked, build output is not)
 pi-gen/work/
 pi-gen/deploy/
-pi-gen/stage-carpi
+pi-gen/stage-signalkit
 pi-gen/*/SKIP_IMAGES
 pi-gen/config
 deploy/

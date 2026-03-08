@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-preview.py — Run the CarPi dashboard with animated sample data.
+preview.py — Run the SignalKit dashboard with animated sample data.
 
 No hardware required. Run from the repo root:
     pip install kivy
@@ -15,7 +15,7 @@ import time
 import os
 
 # Point imports at the carpi/ source directory
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "carpi"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "signalkit"))
 
 # ── Patch config before display imports it ──────────────────────────────────
 import config

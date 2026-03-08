@@ -2,7 +2,7 @@
 # web_server.py - Flask Web Server for Phone Access
 # =============================================================================
 # Serves a mobile-friendly dashboard that phones can access by connecting to
-# the CarPi WiFi hotspot and navigating to http://192.168.4.1:5000
+# the SignalKit WiFi hotspot and navigating to http://192.168.4.1:5000
 #
 # Endpoints:
 #   GET  /              - Live dashboard (real-time updates via SSE)
@@ -43,7 +43,7 @@ app.logger.setLevel(logging.WARNING)
 SHARED_HEAD = """
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#0a0a0f">
+  <meta name="theme-color" content="#0a0a0a">
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon-180.svg">
@@ -54,7 +54,7 @@ SHARED_HEAD = """
     theme: {
       extend: {
         colors: {
-          carpi: { bg: '#0a0a0f', good: '#22c55e', warn: '#f59e0b', danger: '#ef4444' },
+          sk: { bg: '#0a0a0a', good: '#22c55e', warn: '#f59e0b', danger: '#ef4444' },
           acc: '{{ accent_hex }}'
         }
       }
@@ -65,7 +65,7 @@ SHARED_HEAD = """
     @layer base {
       :root { --accent: {{ accent_hex }}; }
       body {
-        @apply bg-zinc-950 text-zinc-100 min-h-screen;
+        background: #0a0a0a; color: #ffffff; min-height: 100vh;
         font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
         -webkit-font-smoothing: antialiased;
       }
@@ -83,13 +83,13 @@ SHARED_HEAD = """
 # ---------------------------------------------------------------------------
 
 DASHBOARD_HTML = """<!DOCTYPE html>
-<html lang="en" class="dark" style="background:#09090b">
+<html lang="en" class="dark" style="background:#0a0a0a">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#09090b">
+  <meta name="theme-color" content="#0a0a0a">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>CarPi</title>
+  <title>SignalKit</title>
   """ + SHARED_HEAD + """
 </head>
 <body>
@@ -100,16 +100,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <svg class="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
       </div>
       <h2 class="text-lg font-bold mb-2">Drive Safely</h2>
-      <p class="text-sm text-zinc-400 leading-relaxed mb-5">CarPi is for informational purposes only. Do not interact with this device while driving. The driver is responsible for safe vehicle operation at all times.</p>
+      <p class="text-sm text-zinc-400 leading-relaxed mb-5">SignalKit is for informational purposes only. Do not interact with this device while driving. The driver is responsible for safe vehicle operation at all times.</p>
       <button onclick="dismissDisclaimer()" class="w-full bg-acc text-white font-bold py-2.5 rounded-xl hover:opacity-90 transition-opacity text-sm">I Understand</button>
     </div>
   </div>
   <script>
     function dismissDisclaimer() {
-      localStorage.setItem('carpi_disclaimer', '1');
+      localStorage.setItem('signalkit_disclaimer', '1');
       document.getElementById('disclaimer').style.display = 'none';
     }
-    if (!localStorage.getItem('carpi_disclaimer')) {
+    if (!localStorage.getItem('signalkit_disclaimer')) {
       document.getElementById('disclaimer').style.display = 'flex';
     }
   </script>
@@ -117,7 +117,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <!-- Header -->
   <div class="flex justify-between items-center px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
     <h1 class="text-sm font-bold tracking-widest flex items-center gap-2">
-      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>CARPI
+      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>SIGNALKIT
     </h1>
     <nav class="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md bg-acc text-white">Dashboard</a>
@@ -198,7 +198,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   <!-- Footer -->
   <div class="text-center py-4 text-xs text-zinc-600 border-t border-zinc-800">
-    CarPi v{{ version }} &middot; <a href="/settings" class="text-zinc-400 hover:text-acc">Settings</a> &middot; {{ ip }}:{{ port }}
+    SignalKit v{{ version }} &middot; <a href="/settings" class="text-zinc-400 hover:text-acc">Settings</a> &middot; {{ ip }}:{{ port }}
   </div>
 
   <script>
@@ -403,19 +403,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 # ---------------------------------------------------------------------------
 
 SETTINGS_HTML = """<!DOCTYPE html>
-<html lang="en" class="dark" style="background:#09090b">
+<html lang="en" class="dark" style="background:#0a0a0a">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#09090b">
-  <title>CarPi Settings</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <title>SignalKit Settings</title>
   """ + SHARED_HEAD + """
 </head>
 <body>
   <!-- Header -->
   <div class="flex justify-between items-center px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
     <h1 class="text-sm font-bold tracking-widest flex items-center gap-2">
-      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>CARPI
+      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>SIGNALKIT
     </h1>
     <nav class="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dashboard</a>
@@ -429,7 +429,7 @@ SETTINGS_HTML = """<!DOCTYPE html>
 
     <div id="restart-banner" class="hidden bg-amber-500/10 border border-amber-500/25 text-amber-400 p-3 text-sm font-medium mb-3 rounded-xl flex justify-between items-center gap-3">
       <span>Some changes require a restart to take effect.</span>
-      <button type="button" onclick="restartCarpi()" id="restart-btn"
+      <button type="button" onclick="restartApp()" id="restart-btn"
         class="bg-amber-500 text-black font-bold text-xs px-3 py-1.5 rounded-lg shrink-0 hover:opacity-85">Restart Now</button>
     </div>
 
@@ -560,7 +560,7 @@ SETTINGS_HTML = """<!DOCTYPE html>
   </div>
 
   <div class="text-center py-4 text-xs text-zinc-600 border-t border-zinc-800">
-    CarPi v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
+    SignalKit v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
   </div>
 
   <script>
@@ -633,7 +633,7 @@ SETTINGS_HTML = """<!DOCTYPE html>
       document.getElementById('restart-banner').classList.remove('hidden');
     }
 
-    async function restartCarpi() {
+    async function restartApp() {
       const btn = document.getElementById('restart-btn');
       btn.disabled = true;
       btn.textContent = 'Restarting...';
@@ -783,19 +783,19 @@ SETTINGS_HTML = """<!DOCTYPE html>
 # ---------------------------------------------------------------------------
 
 UPDATE_HTML = """<!DOCTYPE html>
-<html lang="en" class="dark" style="background:#09090b">
+<html lang="en" class="dark" style="background:#0a0a0a">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#09090b">
-  <title>CarPi Update</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <title>SignalKit Update</title>
   """ + SHARED_HEAD + """
 </head>
 <body>
   <!-- Header -->
   <div class="flex justify-between items-center px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
     <h1 class="text-sm font-bold tracking-widest flex items-center gap-2">
-      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>CARPI
+      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>SIGNALKIT
     </h1>
     <nav class="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dashboard</a>
@@ -807,7 +807,7 @@ UPDATE_HTML = """<!DOCTYPE html>
   <div class="max-w-[600px] mx-auto p-4">
     <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-3.5">
       <h2 class="text-base font-bold mb-1">Software Update</h2>
-      <p class="text-sm text-zinc-500 mb-4 leading-relaxed">Pull the latest code from the git repository and restart CarPi.</p>
+      <p class="text-sm text-zinc-500 mb-4 leading-relaxed">Pull the latest code from the git repository and restart SignalKit.</p>
 
       <div class="flex justify-between items-center py-2.5 border-t border-zinc-800 first:border-t-0">
         <span class="text-xs font-semibold tracking-wide text-zinc-500 uppercase">Current Version</span>
@@ -833,7 +833,7 @@ UPDATE_HTML = """<!DOCTYPE html>
   </div>
 
   <div class="text-center py-4 text-xs text-zinc-600 border-t border-zinc-800">
-    CarPi v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
+    SignalKit v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
   </div>
 
   <script>
@@ -886,8 +886,8 @@ UPDATE_HTML = """<!DOCTYPE html>
         banner.classList.remove('hidden');
         if (result.status === 'updated') {
           banner.className = 'mt-3.5 p-3 rounded-xl text-sm font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400';
-          banner.textContent = 'Update installed! Restarting CarPi...';
-          addLog('Restarting CarPi service...', 'text-emerald-400');
+          banner.textContent = 'Update installed! Restarting SignalKit...';
+          addLog('Restarting SignalKit service...', 'text-emerald-400');
           setTimeout(() => { window.location.reload(); }, 6000);
         } else if (result.status === 'reboot_required') {
           banner.className = 'mt-3.5 p-3 rounded-xl text-sm font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400';
@@ -928,19 +928,19 @@ UPDATE_HTML = """<!DOCTYPE html>
 # ---------------------------------------------------------------------------
 
 DIAGNOSTICS_HTML = """<!DOCTYPE html>
-<html lang="en" class="dark" style="background:#09090b">
+<html lang="en" class="dark" style="background:#0a0a0a">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#09090b">
-  <title>CarPi Diagnostics</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <title>SignalKit Diagnostics</title>
   """ + SHARED_HEAD + """
 </head>
 <body>
   <!-- Header -->
   <div class="flex justify-between items-center px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
     <h1 class="text-sm font-bold tracking-widest flex items-center gap-2">
-      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>CARPI
+      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>SIGNALKIT
     </h1>
     <nav class="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dashboard</a>
@@ -1020,7 +1020,7 @@ DIAGNOSTICS_HTML = """<!DOCTYPE html>
   </div>
 
   <div class="text-center py-4 text-xs text-zinc-600 border-t border-zinc-800">
-    CarPi v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
+    SignalKit v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
   </div>
 
   <script>
@@ -1087,11 +1087,11 @@ DIAGNOSTICS_HTML = """<!DOCTYPE html>
 # ---------------------------------------------------------------------------
 
 SETUP_HTML = """<!DOCTYPE html>
-<html lang="en" class="dark" style="background:#09090b">
+<html lang="en" class="dark" style="background:#0a0a0a">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CarPi Setup</title>
+  <title>SignalKit Setup</title>
 """ + SHARED_HEAD + """
   <style>
     .step { display: none; }
@@ -1111,7 +1111,7 @@ SETUP_HTML = """<!DOCTYPE html>
         <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-acc/15 flex items-center justify-center">
           <svg class="w-8 h-8 text-acc" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
         </div>
-        <h1 class="text-2xl font-bold mb-2">Welcome to CarPi</h1>
+        <h1 class="text-2xl font-bold mb-2">Welcome to SignalKit</h1>
         <p class="text-sm text-zinc-400 leading-relaxed">Let's set up your OBD2 dashboard. This takes about a minute.</p>
       </div>
       <div class="space-y-3 mb-8">
@@ -1121,7 +1121,7 @@ SETUP_HTML = """<!DOCTYPE html>
         </div>
         <div class="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5">
           <div class="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0"><span class="text-sm font-bold text-zinc-500">2</span></div>
-          <div><div class="text-sm font-medium">Set WiFi password</div><div class="text-xs text-zinc-500">Secure your CarPi network</div></div>
+          <div><div class="text-sm font-medium">Set WiFi password</div><div class="text-xs text-zinc-500">Secure your SignalKit network</div></div>
         </div>
         <div class="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-xl p-3.5">
           <div class="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center shrink-0"><span class="text-sm font-bold text-zinc-500">3</span></div>
@@ -1166,7 +1166,7 @@ SETUP_HTML = """<!DOCTYPE html>
       <div class="mb-6">
         <div class="text-xs font-semibold text-acc uppercase tracking-wider mb-1">Step 2 of 2</div>
         <h2 class="text-xl font-bold mb-1">Secure Your WiFi</h2>
-        <p class="text-sm text-zinc-400">Set a password for the CarPi WiFi network, or leave blank to keep it open.</p>
+        <p class="text-sm text-zinc-400">Set a password for the SignalKit WiFi network, or leave blank to keep it open.</p>
       </div>
 
       <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-3">
@@ -1196,13 +1196,13 @@ SETUP_HTML = """<!DOCTYPE html>
           <svg class="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
         </div>
         <h2 class="text-2xl font-bold mb-2">You're All Set!</h2>
-        <p class="text-sm text-zinc-400 leading-relaxed mb-6">CarPi is configured and ready. Start your engine to see live data.</p>
+        <p class="text-sm text-zinc-400 leading-relaxed mb-6">SignalKit is configured and ready. Start your engine to see live data.</p>
         <div id="setup-summary" class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-6 text-left space-y-2">
           <div class="flex justify-between text-sm"><span class="text-zinc-500">Adapter</span><span class="font-mono" id="summary-mac">--</span></div>
           <div class="flex justify-between text-sm"><span class="text-zinc-500">WiFi</span><span id="summary-wifi">--</span></div>
         </div>
         <div class="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-6" id="setup-reboot-notice" class="hidden">
-          CarPi will restart to apply your settings. This takes about 15 seconds.
+          SignalKit will restart to apply your settings. This takes about 15 seconds.
         </div>
         <a href="/" class="block w-full bg-acc text-white font-bold py-3 rounded-xl hover:opacity-90 transition-opacity text-center">Open Dashboard</a>
       </div>
@@ -1331,18 +1331,18 @@ SETUP_HTML = """<!DOCTYPE html>
 # ---------------------------------------------------------------------------
 
 ABOUT_HTML = """<!DOCTYPE html>
-<html lang="en" class="dark" style="background:#09090b">
+<html lang="en" class="dark" style="background:#0a0a0a">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>About CarPi</title>
+  <title>About SignalKit</title>
 """ + SHARED_HEAD + """
 </head>
 <body>
   <!-- Header -->
   <div class="flex justify-between items-center px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
     <h1 class="text-sm font-bold tracking-widest flex items-center gap-2">
-      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>CARPI
+      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>SIGNALKIT
     </h1>
     <nav class="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dashboard</a>
@@ -1358,7 +1358,7 @@ ABOUT_HTML = """<!DOCTYPE html>
       <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-acc/10 border border-acc/20 flex items-center justify-center">
         <svg class="w-10 h-10 text-acc" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
       </div>
-      <h1 class="text-xl font-bold">CarPi</h1>
+      <h1 class="text-xl font-bold">SignalKit</h1>
       <p class="text-sm text-zinc-500 mt-1">Version {{ version }}</p>
     </div>
 
@@ -1378,11 +1378,11 @@ ABOUT_HTML = """<!DOCTYPE html>
       </div>
     </div>
 
-    <!-- What is CarPi -->
+    <!-- What is SignalKit -->
     <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-      <h2 class="text-sm font-bold mb-2">What is CarPi?</h2>
+      <h2 class="text-sm font-bold mb-2">What is SignalKit?</h2>
       <p class="text-xs text-zinc-400 leading-relaxed">
-        CarPi is a real-time OBD2 vehicle dashboard built for Raspberry Pi. It connects to your car's
+        SignalKit is a real-time OBD2 vehicle dashboard built for Raspberry Pi. It connects to your car's
         diagnostic port via Bluetooth, displays live engine data on an HDMI screen, and serves a
         mobile-friendly dashboard to your phone over WiFi.
       </p>
@@ -1392,7 +1392,7 @@ ABOUT_HTML = """<!DOCTYPE html>
     <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
       <h2 class="text-sm font-bold text-amber-400 mb-2">Safety Notice</h2>
       <p class="text-xs text-zinc-400 leading-relaxed">
-        CarPi is for informational purposes only. Do not interact with this device while driving.
+        SignalKit is for informational purposes only. Do not interact with this device while driving.
         The driver is solely responsible for safe vehicle operation at all times. Data displayed may
         not be accurate — always rely on your vehicle's factory gauges for critical information.
       </p>
@@ -1427,7 +1427,7 @@ ABOUT_HTML = """<!DOCTYPE html>
   </div>
 
   <div class="text-center py-4 text-xs text-zinc-600 border-t border-zinc-800">
-    CarPi v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
+    SignalKit v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
   </div>
 </body>
 </html>
@@ -1685,12 +1685,12 @@ def captive_misc():
 def pwa_manifest():
     accent = config.get_theme()["accent"]
     manifest = {
-        "name": "CarPi Dashboard",
-        "short_name": "CarPi",
+        "name": "SignalKit Dashboard",
+        "short_name": "SignalKit",
         "description": "Real-time OBD2 vehicle dashboard",
         "start_url": "/",
         "display": "standalone",
-        "background_color": "#0a0a0f",
+        "background_color": "#0a0a0a",
         "theme_color": accent,
         "icons": [
             {"src": "/icon.svg", "sizes": "any", "type": "image/svg+xml"},
@@ -1704,7 +1704,7 @@ def pwa_manifest():
 def pwa_icon():
     accent = config.get_theme()["accent"]
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
-  <rect width="180" height="180" rx="40" fill="#0a0a0f"/>
+  <rect width="180" height="180" rx="40" fill="#0a0a0a"/>
   <circle cx="90" cy="90" r="50" fill="none" stroke="{accent}" stroke-width="6" opacity="0.3"/>
   <circle cx="90" cy="90" r="30" fill="none" stroke="{accent}" stroke-width="4" opacity="0.5"/>
   <circle cx="90" cy="90" r="8" fill="{accent}"/>
@@ -1973,8 +1973,8 @@ def _bt_scan_macos():
 def api_restart():
     def _do_restart():
         time.sleep(1.5)
-        logger.info("Restarting CarPi service via API request")
-        os.system("sudo systemctl restart carpi 2>/dev/null || sudo kill -SIGTERM 1")
+        logger.info("Restarting SignalKit service via API request")
+        os.system("sudo systemctl restart signalkit 2>/dev/null || sudo kill -SIGTERM 1")
     threading.Thread(target=_do_restart, daemon=True).start()
     return jsonify({"ok": True, "message": "Restarting in 1.5 seconds"})
 
@@ -1990,8 +1990,8 @@ def api_update_post():
     if result["status"] == "updated":
         def _do_restart():
             time.sleep(2.0)
-            logger.info("Restarting CarPi after OTA update")
-            os.system("sudo systemctl restart carpi 2>/dev/null || sudo kill -SIGTERM 1")
+            logger.info("Restarting SignalKit after OTA update")
+            os.system("sudo systemctl restart signalkit 2>/dev/null || sudo kill -SIGTERM 1")
         threading.Thread(target=_do_restart, daemon=True).start()
     elif result["status"] == "reboot_required":
         def _do_reboot():
@@ -2007,12 +2007,12 @@ def api_update_post():
 # ---------------------------------------------------------------------------
 
 DEV_HTML = """<!DOCTYPE html>
-<html lang="en" class="dark" style="background:#09090b">
+<html lang="en" class="dark" style="background:#0a0a0a">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <meta name="theme-color" content="#09090b">
-  <title>CarPi Dev Console</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <title>SignalKit Dev Console</title>
   """ + SHARED_HEAD + """
   <style>
     #terminal { font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace; }
@@ -2027,7 +2027,7 @@ DEV_HTML = """<!DOCTYPE html>
   <!-- Header -->
   <div class="flex justify-between items-center px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
     <h1 class="text-sm font-bold tracking-widest flex items-center gap-2">
-      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>CARPI
+      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>SIGNALKIT
     </h1>
     <nav class="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dashboard</a>
@@ -2105,7 +2105,7 @@ DEV_HTML = """<!DOCTYPE html>
   </div>
 
   <div class="text-center py-4 text-xs text-zinc-600 border-t border-zinc-800">
-    CarPi v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
+    SignalKit v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
   </div>
 
   <script>
@@ -2215,7 +2215,7 @@ DEV_HTML = """<!DOCTYPE html>
       }
     });
 
-    appendLine('CarPi Dev Console ready.', 'info');
+    appendLine('SignalKit Dev Console ready.', 'info');
     appendLine('Type an OBD command (e.g. 010C) or ELM327 command (e.g. ATZ) and press Enter.', 'info');
     checkStatus();
     setInterval(checkStatus, 5000);
