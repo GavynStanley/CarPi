@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Background -->
+  <rect width="64" height="64" fill="#0e0e0e" rx="14.4"/>
+
+  <!-- Subtle red glow -->
+  <radialGradient id="glow" cx="75%" cy="25%" r="60%">
+    <stop offset="0%" stop-color="#DC2626" stop-opacity="0.25"/>
+    <stop offset="100%" stop-color="#DC2626" stop-opacity="0"/>
+  </radialGradient>
+  <rect width="64" height="64" fill="url(#glow)" rx="14.4"/>
+
+  <!-- Signal bars centred -->
+  <rect x="10" y="46" width="8" height="10" rx="2.5" fill="#DC2626" opacity="0.30"/>
+  <rect x="21" y="38" width="8" height="18" rx="2.5" fill="#DC2626" opacity="0.55"/>
+  <rect x="32" y="28" width="8" height="28" rx="2.5" fill="#DC2626" opacity="0.78"/>
+  <rect x="43" y="16" width="8" height="40" rx="2.5" fill="#DC2626"/>
+
+  <!-- Subtle waveform at bottom -->
+  <polyline
+    points="2,58 10,58 14,50 18,66 22,58 32,58 36,46 40,70 44,58 62,58"
+    fill="none" stroke="#DC2626" stroke-width="1.2" stroke-opacity="0.12"
+    stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

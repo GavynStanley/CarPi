@@ -1,7 +1,8 @@
 [Unit]
 Description=CarPi X11 Display Server
 Documentation=file:///opt/carpi/README.md
-After=systemd-user-sessions.service
+After=systemd-user-sessions.service plymouth-quit.service
+Wants=plymouth-quit.service
 
 # Only start if there's a display device
 ConditionPathExists=/dev/fb0
@@ -20,8 +21,6 @@ ExecStartPost=/usr/bin/xsetroot -display :0 -solid black
 ExecStartPost=/usr/bin/xset -display :0 s off
 ExecStartPost=/usr/bin/xset -display :0 -dpms
 ExecStartPost=/usr/bin/xset -display :0 s noblank
-# Tell Plymouth we've taken over the display
-ExecStartPost=-/usr/bin/plymouth quit --retain-splash
 Restart=always
 RestartSec=3
 
