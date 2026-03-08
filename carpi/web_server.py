@@ -1467,7 +1467,7 @@ _TAB_LABELS = {
 }
 
 
-def _build_settings_context() -> tuple[dict, list]:
+def _build_settings_context():
     raw = config.get_current_settings()
     # Filter out hidden settings (e.g. SETUP_COMPLETE)
     raw = {k: v for k, v in raw.items() if not v.get("hidden")}
@@ -1569,7 +1569,7 @@ def _is_overlayfs() -> bool:
     return False
 
 
-def _disable_overlayfs() -> tuple[bool, str]:
+def _disable_overlayfs():
     """Temporarily disable overlayfs so git pull persists to SD card.
     Uses raspi-config noninteractive mode. Requires a reboot to take effect,
     so we do: disable overlay -> reboot -> pull -> enable overlay -> reboot."""
@@ -1585,7 +1585,7 @@ def _disable_overlayfs() -> tuple[bool, str]:
         return False, str(e)
 
 
-def _enable_overlayfs() -> tuple[bool, str]:
+def _enable_overlayfs():
     """Re-enable overlayfs after a persistent update."""
     try:
         r = subprocess.run(

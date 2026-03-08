@@ -19,6 +19,7 @@
 import threading
 import time
 import logging
+import platform
 import subprocess
 
 import obd
@@ -187,7 +188,7 @@ quit
 # Kia Extended PID (Oil Temperature)
 # ---------------------------------------------------------------------------
 
-def _read_kia_oil_temp(connection) -> float | None:
+def _read_kia_oil_temp(connection):
     """
     Attempt to read Kia/Hyundai oil temperature via mode 22 extended PID.
 
@@ -370,6 +371,8 @@ def _poll_slow(connection, kia_oil_supported: bool) -> bool:
         if not dtc_response.is_null():
             raw_dtcs = dtc_response.value  # List of (code, description) tuples
             codes = [entry[0] for entry in raw_dtcs if entry and entry[0]]
+            if codes:
+                logger.info("DTCs found: %s", codes)
             updates["dtcs"] = format_dtc_list(codes)
             updates["dtc_count"] = len(codes)
             updates["mil_on"] = len(codes) > 0
@@ -378,7 +381,7 @@ def _poll_slow(connection, kia_oil_supported: bool) -> bool:
             updates["dtc_count"] = 0
             updates["mil_on"] = False
     except Exception as e:
-        logger.debug(f"DTC query failed: {e}")
+        logger.warning(f"DTC query failed: {e}")
 
     _update_many(updates)
     return kia_oil_supported
@@ -459,15 +462,23 @@ class OBDReader(threading.Thread):
         """
         _update_many({"connected": False, "status": "Connecting to OBD2..."})
 
-        # Ensure Bluetooth is paired and rfcomm is bound
-        logger.info("Setting up Bluetooth connection...")
-        pair_bluetooth()
-        time.sleep(2)  # Give Bluetooth time to settle
+        # Skip Bluetooth setup on macOS or when using a non-rfcomm port
+        # (e.g. ELM327-emulator on a virtual serial port)
+        _is_rfcomm = config.OBD_PORT.startswith("/dev/rfcomm")
+        _is_linux = platform.system() == "Linux"
 
-        if not bind_rfcomm():
-            _update("status", "rfcomm bind failed — retrying...")
-            self._stop_event.wait(config.OBD_RECONNECT_DELAY)
-            return
+        if _is_linux and _is_rfcomm:
+            logger.info("Setting up Bluetooth connection...")
+            pair_bluetooth()
+            time.sleep(2)  # Give Bluetooth time to settle
+
+            if not bind_rfcomm():
+                _update("status", "rfcomm bind failed — retrying...")
+                self._stop_event.wait(config.OBD_RECONNECT_DELAY)
+                return
+        else:
+            logger.info("Skipping Bluetooth setup (port=%s, platform=%s)",
+                        config.OBD_PORT, platform.system())
 
         # Connect via python-OBD
         logger.info(f"Connecting to OBD2 on {config.OBD_PORT}...")
@@ -526,6 +537,12 @@ class OBDReader(threading.Thread):
         # Main polling loop
         while not self._stop_event.is_set():
             loop_start = time.time()
+
+            # Check if the connection is still alive
+            if not connection.is_connected():
+                logger.warning("OBD connection lost — reconnecting...")
+                _update_many({"connected": False, "status": "Connection lost — reconnecting..."})
+                break
 
             try:
                 # Always poll fast data

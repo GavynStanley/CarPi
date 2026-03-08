@@ -50,6 +50,16 @@ apt-get remove -y --purge \
     manpages \
     2>/dev/null || true
 
+# Pi Zero 2 W only needs the v7 kernel (armv7l, 32-bit).
+# Remove v6 (Pi 1/Zero 1) and v8 (64-bit) kernels to:
+#   - Skip 2 of 3 initramfs rebuilds during package installs (~10 min saved)
+#   - Save ~60MB in the final image
+echo "Removing unused kernel variants (keeping v7 for Pi Zero 2 W)..."
+apt-get remove -y --purge \
+    "linux-image-*-v6+" \
+    "linux-image-*-v8+" \
+    2>/dev/null || true
+
 apt-get autoremove -y --purge
 apt-get clean
 rm -rf /var/lib/apt/lists/*
@@ -129,19 +139,8 @@ cat > "${ROOTFS_DIR}/etc/NetworkManager/conf.d/99-carpi-unmanaged.conf" << 'EOF'
 unmanaged-devices=interface-name:wlan0
 EOF
 
-# (b) Static IP via systemd-networkd (works on both Bookworm and Bullseye)
-cat > "${ROOTFS_DIR}/etc/systemd/network/10-carpi-wlan0.network" << 'EOF'
-[Match]
-Name=wlan0
-
-[Network]
-Address=192.168.4.1/24
-DHCPServer=no
-EOF
-
-on_chroot << 'EOF'
-systemctl enable systemd-networkd 2>/dev/null || true
-EOF
+# (b) Static IP — assigned by carpi-wifi.service before hostapd starts
+# (using `ip addr add` in the service, no systemd-networkd needed)
 
 # (b-fallback) Also write dhcpcd.conf in case this is a Bullseye-based build
 if [[ -f "${ROOTFS_DIR}/etc/dhcpcd.conf" ]]; then

@@ -37,6 +37,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("main")
 
+# Silence python-OBD's per-poll "not supported" warnings — we handle
+# unsupported PIDs gracefully in obd_reader.py already.
+logging.getLogger("obd.obd").setLevel(logging.ERROR)
+
 # ---------------------------------------------------------------------------
 # Import project modules (after logging is configured)
 # ---------------------------------------------------------------------------

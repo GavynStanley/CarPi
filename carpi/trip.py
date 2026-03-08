@@ -30,7 +30,7 @@ _trip = {
 }
 
 
-def update(speed_mph: float | None, mpg: float | None, rpm: int | None):
+def update(speed_mph=None, mpg=None, rpm=None):
     """Called every fast poll cycle with current readings."""
     with _lock:
         now = time.time()

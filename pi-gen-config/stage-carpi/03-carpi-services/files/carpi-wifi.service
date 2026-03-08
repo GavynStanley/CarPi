@@ -1,10 +1,12 @@
 [Unit]
 Description=CarPi WiFi hotspot configuration
-Before=hostapd.service
+Before=hostapd.service dnsmasq.service
 After=network-pre.target
 
 [Service]
 Type=oneshot
+ExecStartPre=/sbin/ip link set wlan0 up
+ExecStartPre=/bin/bash -c '/sbin/ip addr show wlan0 | grep -q 192.168.4.1 || /sbin/ip addr add 192.168.4.1/24 dev wlan0'
 ExecStart=/bin/bash -c '\
     SSID=$(python3 -c "import sys; sys.path.insert(0, \"/opt/carpi/carpi\"); import config; print(config.HOTSPOT_SSID)"); \
     PASS=$(python3 -c "import sys; sys.path.insert(0, \"/opt/carpi/carpi\"); import config; print(config.HOTSPOT_PASSWORD)"); \

@@ -36,16 +36,19 @@ step() { echo -e "\n${BLUE}==> $*${NC}"; }
 
 USE_DOCKER=0
 CLEAN=0
+CLEAN_CARPI=0
 
 # Parse arguments
 for arg in "$@"; do
     case "$arg" in
-        --docker) USE_DOCKER=1 ;;
-        --clean)  CLEAN=1 ;;
+        --docker)      USE_DOCKER=1 ;;
+        --clean)       CLEAN=1 ;;
+        --clean-carpi) CLEAN_CARPI=1 ;;
         --help|-h)
-            echo "Usage: $0 [--docker] [--clean]"
-            echo "  --docker   Build inside Docker (required on macOS/Windows)"
-            echo "  --clean    Remove previous build artifacts before building"
+            echo "Usage: $0 [--docker] [--clean] [--clean-carpi]"
+            echo "  --docker       Build inside Docker (required on macOS/Windows)"
+            echo "  --clean        Remove ALL build artifacts (full rebuild)"
+            echo "  --clean-carpi  Re-run only stage-carpi (keeps stages 0-2 cached)"
             exit 0
             ;;
         *) err "Unknown argument: $arg" ;;
@@ -178,9 +181,14 @@ done
 # ---------------------------------------------------------------------------
 
 if [[ ${CLEAN} -eq 1 ]]; then
-    step "Cleaning previous build artifacts"
+    step "Cleaning ALL build artifacts (full rebuild)"
     sudo rm -rf "${PIGEN_DIR}/work" "${PIGEN_DIR}/deploy"
     log "Cleaned"
+elif [[ ${CLEAN_CARPI} -eq 1 ]]; then
+    step "Cleaning stage-carpi only (stages 0-2 cached)"
+    sudo rm -f "${PIGEN_DIR}/work/stage-carpi/SKIP"
+    sudo rm -rf "${PIGEN_DIR}/deploy"
+    log "Removed stage-carpi SKIP marker — it will re-run"
 fi
 
 # ---------------------------------------------------------------------------
@@ -266,7 +274,7 @@ echo ""
 echo "  2. Insert SD card into Pi Zero 2 W and power on."
 echo "     Dashboard appears in ~15 seconds."
 echo ""
-echo "  3. Connect to 'CarPi' WiFi and open http://192.168.4.1:5000"
+echo "  3. Connect to 'CarPi' WiFi (password: carpi1234) and open http://192.168.4.1:8080"
 echo ""
 if [[ "${OBD_MAC}" == "AA:BB:CC:DD:EE:FF" ]]; then
     echo -e "  ${YELLOW}4. Set your OBD2 MAC address:${NC}"

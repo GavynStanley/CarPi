@@ -42,7 +42,7 @@ _OVERRIDE_PATHS = [
 ]
 
 # Resolved path actually in use — set by load_overrides()
-_active_override_path: str | None = None
+_active_override_path = None  # type: str | None
 
 # ---------------------------------------------------------------------------
 # Defaults — all settings start here, then overrides are applied on top
@@ -50,7 +50,7 @@ _active_override_path: str | None = None
 
 # --- OBD2 Adapter ---
 OBD_MAC = "AA:BB:CC:DD:EE:FF"   # Replace with your Veepeak adapter's MAC
-OBD_PORT = "/dev/rfcomm0"        # Serial port after rfcomm bind
+OBD_PORT = "/dev/ttys004"        # Serial port after rfcomm bind
 OBD_BAUDRATE = 38400             # ELM327 default baud rate
 OBD_CONNECT_TIMEOUT = 30         # Seconds to wait for connection on boot
 OBD_RECONNECT_DELAY = 5          # Seconds to wait before retrying after disconnect
@@ -334,7 +334,7 @@ def _apply(overrides: dict):
             _logger.debug(f"Ignoring unrecognised override key: {key!r}")
 
 
-def save_setting(key: str, raw_value: str) -> tuple[bool, str]:
+def save_setting(key, raw_value):
     """
     Validate, persist, and immediately apply a single setting change.
 

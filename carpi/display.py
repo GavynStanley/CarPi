@@ -368,13 +368,13 @@ tailwind.config = {{
 
   /* --- DTC items --- */
   .dtc-item {{
-    display: flex; align-items: center; gap: 8px;
-    padding: 3px 8px; margin-bottom: 2px;
-    border-radius: 6px; font-size: 0.65rem;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 6px; margin-right: 6px;
+    border-radius: 4px; font-size: 0.6rem;
     background: rgba(239,68,68,0.08);
     border: 1px solid rgba(239,68,68,0.15);
+    white-space: nowrap;
   }}
-  .dtc-item:last-child {{ margin-bottom: 0; }}
 
   /* --- Sparklines --- */
   .sparkline {{
@@ -488,9 +488,9 @@ tailwind.config = {{
   </div>
 
   <!-- DTC section -->
-  <div class="dcard flex flex-col justify-center px-2.5 py-1 text-left overflow-y-auto">
-    <div class="text-[0.45rem] font-semibold tracking-widest uppercase dcard-label mb-1">Fault Codes</div>
-    <div id="dtc-list"><span class="text-xs text-emerald-500">No active fault codes</span></div>
+  <div class="dcard flex items-center px-2.5 py-0.5 text-left overflow-hidden">
+    <div class="text-[0.45rem] font-semibold tracking-widest uppercase dcard-label shrink-0 mr-2">Fault Codes</div>
+    <div id="dtc-list" class="flex items-center overflow-x-auto gap-0" style="scrollbar-width:none"><span class="text-[0.6rem] text-emerald-500">No active fault codes</span></div>
   </div>
 </div>
 
@@ -677,17 +677,17 @@ tailwind.config = {{
     // DTCs
     const dtcList = document.getElementById('dtc-list');
     if (!d.dtcs || !d.dtcs.length) {{
-      dtcList.innerHTML = '<span class="text-xs text-emerald-500">No active fault codes</span>';
+      dtcList.innerHTML = '<span class="text-[0.6rem] text-emerald-500">No active fault codes</span>';
     }} else {{
-      dtcList.innerHTML = d.dtcs.slice(0, 3).map(function(dtc) {{
-        return '<div class="dtc-item">' +
-          '<span class="inline-block bg-red-500/20 text-red-400 text-[0.6rem] font-bold font-mono px-1.5 py-0.5 rounded">' + dtc.code + '</span>' +
-          '<span class="text-xs text-zinc-400">' + dtc.description + '</span>' +
-          '</div>';
+      dtcList.innerHTML = d.dtcs.slice(0, 5).map(function(dtc) {{
+        return '<span class="dtc-item" title="' + dtc.description + '">' +
+          '<span class="font-bold font-mono text-red-400">' + dtc.code + '</span>' +
+          '<span class="text-zinc-400">' + dtc.description + '</span>' +
+          '</span>';
       }}).join('');
-      if (d.dtcs.length > 3) {{
-        dtcList.innerHTML += '<div class="text-xs text-zinc-500 mt-1">+' +
-          (d.dtcs.length - 3) + ' more</div>';
+      if (d.dtcs.length > 5) {{
+        dtcList.innerHTML += '<span class="text-[0.55rem] text-zinc-500 ml-1">+' +
+          (d.dtcs.length - 5) + ' more</span>';
       }}
     }}
 
