@@ -215,6 +215,13 @@ gpu_mem=128
 
 # Disable the rainbow splash screen and text during boot for a cleaner startup
 disable_splash=1
+
+# =============================================================================
+# USB Gadget Mode (SSH over USB for development)
+# =============================================================================
+# Enables the Pi Zero 2 W's USB port as an ethernet gadget so you can
+# SSH in over a USB cable from a Mac/PC without WiFi or a keyboard.
+dtoverlay=dwc2
 EOF
 
 # ---------------------------------------------------------------------------
@@ -250,7 +257,7 @@ CMDLINE="${ROOTFS_DIR}/boot/cmdline.txt"
 
 # cmdline.txt is a single line — read it, strip newline, append our params
 EXISTING=$(cat "${CMDLINE}" | tr -d '\n')
-for PARAM in "quiet" "splash" "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "systemd.show_status=false" "rd.systemd.show_status=false" "console=tty3"; do
+for PARAM in "modules-load=dwc2,g_ether" "quiet" "splash" "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "systemd.show_status=false" "rd.systemd.show_status=false" "console=tty3"; do
     if ! echo "${EXISTING}" | grep -q "${PARAM}"; then
         EXISTING="${EXISTING} ${PARAM}"
     fi
@@ -265,7 +272,34 @@ echo "carpi" > "${ROOTFS_DIR}/etc/hostname"
 sed -i "s/raspberrypi/carpi/g" "${ROOTFS_DIR}/etc/hosts" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
-# 11. Display permissions (no X11)
+# 11. USB gadget networking — static IP on usb0
+# ---------------------------------------------------------------------------
+# When the Pi is connected to a Mac/PC via USB, g_ether creates a usb0
+# interface. This service gives it a static link-local IP so SSH works
+# immediately without any config on the host side.
+cat > "${ROOTFS_DIR}/etc/systemd/system/usb-gadget-ip.service" << 'EOF'
+[Unit]
+Description=Configure USB gadget ethernet (usb0) with static IP
+After=network-pre.target sys-subsystem-net-devices-usb0.device
+Wants=sys-subsystem-net-devices-usb0.device
+ConditionPathExists=/sys/class/net/usb0
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/sbin/ip addr add 169.254.100.2/16 dev usb0
+ExecStart=/sbin/ip link set usb0 up
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+on_chroot << 'EOF'
+systemctl enable usb-gadget-ip.service
+EOF
+
+# ---------------------------------------------------------------------------
+# 12. Display permissions (no X11)
 # ---------------------------------------------------------------------------
 on_chroot << 'EOF'
 usermod -aG video,render,input,dialout pi
@@ -281,7 +315,7 @@ SUBSYSTEM=="drm", MODE="0660", GROUP="render"
 EOF
 
 # ---------------------------------------------------------------------------
-# 12. Set Kivy environment for headless display in pi user's profile
+# 13. Set Kivy environment for headless display in pi user's profile
 # ---------------------------------------------------------------------------
 cat >> "${ROOTFS_DIR}/home/pi/.bashrc" << 'EOF'
 
