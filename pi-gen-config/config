@@ -28,6 +28,7 @@ KEYBOARD_LAYOUT="English (US)"
 # The single system user. CarPi runs as this user.
 FIRST_USER_NAME="pi"
 FIRST_USER_PASS="carpi"      # Change this if you care about SSH security
+DISABLE_FIRST_BOOT_USER_RENAME=1
 
 # --- SSH ---
 # Disabled by default — this is an embedded device, not a server.
