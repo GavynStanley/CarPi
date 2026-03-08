@@ -31,6 +31,56 @@ from dtc_descriptions import format_dtc_list
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Active OBD connection reference (set by OBDReader, used by dev commands)
+# ---------------------------------------------------------------------------
+_conn_lock = threading.Lock()
+_active_connection = None  # type: obd.OBD | None
+
+
+def _set_connection(conn):
+    """Store the active OBD connection for use by dev commands."""
+    global _active_connection
+    with _conn_lock:
+        _active_connection = conn
+
+
+def send_raw_command(hex_cmd: str) -> dict:
+    """
+    Send a raw OBD command (hex string like '010C' or 'ATZ') and return
+    the response. Used by the dev console.
+
+    Returns dict with keys: ok, command, response, error
+    """
+    hex_cmd = hex_cmd.strip().upper()
+    if not hex_cmd:
+        return {"ok": False, "command": hex_cmd, "response": "", "error": "Empty command"}
+
+    with _conn_lock:
+        conn = _active_connection
+
+    if conn is None or not conn.is_connected():
+        return {"ok": False, "command": hex_cmd, "response": "", "error": "Not connected to OBD adapter"}
+
+    try:
+        cmd = obd.OBDCommand(
+            "DEV_RAW",
+            "Dev Console Raw",
+            hex_cmd.replace(" ", "").encode(),
+            0,
+            lambda msgs, unit: msgs,
+            obd.ECU.ALL,
+            True,
+        )
+        response = conn.query(cmd, force=True)
+        if response.is_null():
+            return {"ok": True, "command": hex_cmd, "response": "NO DATA", "error": ""}
+        raw = str(response.value)
+        return {"ok": True, "command": hex_cmd, "response": raw, "error": ""}
+    except Exception as e:
+        return {"ok": False, "command": hex_cmd, "response": "", "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
 # Shared data store — all vehicle readings are stored here.
 # Access via get_data() for thread-safe reads.
 # ---------------------------------------------------------------------------
@@ -505,6 +555,7 @@ class OBDReader(threading.Thread):
             return
 
         logger.info("OBD2 connected successfully")
+        _set_connection(connection)
         _update_many({"connected": True, "status": "Connected", "poll_errors": 0})
 
         # Populate diagnostics
@@ -575,6 +626,7 @@ class OBDReader(threading.Thread):
             self._stop_event.wait(sleep_time)
 
         # Clean up
+        _set_connection(None)
         try:
             connection.close()
         except Exception:

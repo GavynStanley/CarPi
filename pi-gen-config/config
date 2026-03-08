@@ -33,7 +33,7 @@ DISABLE_FIRST_BOOT_USER_RENAME=1
 # --- SSH ---
 # Disabled by default — this is an embedded device, not a server.
 # Set to 1 only for development builds.
-ENABLE_SSH=0
+ENABLE_SSH=1
 
 # --- WiFi ---
 # Leave blank — we use wlan0 as the hotspot AP, not a WiFi client.

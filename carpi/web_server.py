@@ -123,6 +123,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md bg-acc text-white">Dashboard</a>
       <a href="/settings" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Settings</a>
       <a href="/diagnostics" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Diag</a>
+      <a href="/dev" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dev</a>
     </nav>
   </div>
 
@@ -420,6 +421,7 @@ SETTINGS_HTML = """<!DOCTYPE html>
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dashboard</a>
       <a href="/settings" class="text-xs font-semibold px-3 py-1 rounded-md bg-acc text-white">Settings</a>
       <a href="/diagnostics" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Diag</a>
+      <a href="/dev" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dev</a>
     </nav>
   </div>
 
@@ -944,6 +946,7 @@ DIAGNOSTICS_HTML = """<!DOCTYPE html>
       <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dashboard</a>
       <a href="/settings" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Settings</a>
       <a href="/diagnostics" class="text-xs font-semibold px-3 py-1 rounded-md bg-acc text-white">Diag</a>
+      <a href="/dev" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dev</a>
     </nav>
   </div>
 
@@ -1996,6 +1999,250 @@ def api_update_post():
             logger.info("Rebooting Pi to apply OTA update (overlayfs toggle)")
             os.system("sudo reboot")
         threading.Thread(target=_do_reboot, daemon=True).start()
+    return jsonify(result)
+
+
+# ---------------------------------------------------------------------------
+# Dev Console (raw OBD command terminal)
+# ---------------------------------------------------------------------------
+
+DEV_HTML = """<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#09090b">
+  <title>CarPi Dev Console</title>
+  """ + SHARED_HEAD + """
+  <style>
+    #terminal { font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace; }
+    #terminal .cmd { color: #3b82f6; }
+    #terminal .resp { color: #22c55e; }
+    #terminal .err { color: #ef4444; }
+    #terminal .info { color: #71717a; }
+    #cmd-input { font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace; }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="flex justify-between items-center px-4 py-2.5 bg-zinc-900 border-b border-zinc-800 sticky top-0 z-50">
+    <h1 class="text-sm font-bold tracking-widest flex items-center gap-2">
+      <span class="w-2 h-2 bg-acc rounded-full shadow-[0_0_8px_var(--accent)]"></span>CARPI
+    </h1>
+    <nav class="flex gap-0.5 bg-zinc-800 rounded-lg p-0.5">
+      <a href="/" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Dashboard</a>
+      <a href="/settings" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Settings</a>
+      <a href="/diagnostics" class="text-xs font-semibold px-3 py-1 rounded-md text-zinc-400 hover:text-white">Diag</a>
+      <a href="/dev" class="text-xs font-semibold px-3 py-1 rounded-md bg-acc text-white">Dev</a>
+    </nav>
+  </div>
+
+  <div class="max-w-[700px] mx-auto p-4">
+
+    <!-- Info -->
+    <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-4">
+      <div class="flex items-start gap-2.5">
+        <svg class="w-5 h-5 text-amber-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        <div>
+          <div class="text-sm font-semibold text-amber-300">Development Mode</div>
+          <div class="text-xs text-amber-200/70 mt-0.5 leading-relaxed">Send raw OBD-II / ELM327 commands directly to the adapter. Incorrect commands won't damage your car but may temporarily confuse the adapter.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connection status -->
+    <div class="flex items-center gap-2 mb-4">
+      <span class="w-2 h-2 rounded-full" id="dev-dot"></span>
+      <span class="text-xs text-zinc-500" id="dev-status">Checking...</span>
+    </div>
+
+    <!-- Quick commands -->
+    <div class="mb-4">
+      <div class="text-xs font-semibold tracking-widest uppercase text-zinc-500 mb-2">Quick Commands</div>
+      <div class="flex flex-wrap gap-1.5">
+        <button onclick="sendQuick('ATZ')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">ATZ (Reset)</button>
+        <button onclick="sendQuick('ATI')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">ATI (ID)</button>
+        <button onclick="sendQuick('ATRV')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">ATRV (Voltage)</button>
+        <button onclick="sendQuick('ATDP')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">ATDP (Protocol)</button>
+        <button onclick="sendQuick('0100')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">0100 (PIDs 01-20)</button>
+        <button onclick="sendQuick('0120')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">0120 (PIDs 21-40)</button>
+        <button onclick="sendQuick('0140')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">0140 (PIDs 41-60)</button>
+        <button onclick="sendQuick('010C')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">010C (RPM)</button>
+        <button onclick="sendQuick('010D')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">010D (Speed)</button>
+        <button onclick="sendQuick('0105')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">0105 (Coolant)</button>
+        <button onclick="sendQuick('03')" class="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 px-2.5 py-1.5 rounded-lg hover:bg-zinc-700 transition-colors">03 (DTCs)</button>
+      </div>
+    </div>
+
+    <!-- Terminal -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-2 border-b border-zinc-800">
+        <span class="text-xs font-semibold tracking-widest uppercase text-zinc-500">Terminal</span>
+        <button onclick="clearTerminal()" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Clear</button>
+      </div>
+      <div id="terminal" class="p-4 h-[400px] overflow-y-auto text-sm leading-relaxed"></div>
+      <div class="flex border-t border-zinc-800">
+        <span class="text-acc font-mono text-sm px-3 py-3 select-none">&gt;</span>
+        <input type="text" id="cmd-input" class="flex-1 bg-transparent text-sm text-zinc-100 py-3 pr-3 outline-none placeholder-zinc-600" placeholder="Enter OBD command (e.g. 010C, ATZ, 2201...)" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button onclick="sendCommand()" id="send-btn" class="px-4 text-sm font-semibold text-acc hover:text-white transition-colors">Send</button>
+      </div>
+    </div>
+
+    <!-- Reference -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mt-4">
+      <div class="text-xs font-semibold tracking-widest uppercase text-zinc-500 mb-2">OBD-II Mode Reference</div>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+        <div class="flex justify-between py-1 border-b border-zinc-800"><span class="text-zinc-400">01</span><span class="text-zinc-500">Current data</span></div>
+        <div class="flex justify-between py-1 border-b border-zinc-800"><span class="text-zinc-400">02</span><span class="text-zinc-500">Freeze frame</span></div>
+        <div class="flex justify-between py-1 border-b border-zinc-800"><span class="text-zinc-400">03</span><span class="text-zinc-500">Read DTCs</span></div>
+        <div class="flex justify-between py-1 border-b border-zinc-800"><span class="text-zinc-400">04</span><span class="text-zinc-500">Clear DTCs</span></div>
+        <div class="flex justify-between py-1 border-b border-zinc-800"><span class="text-zinc-400">09</span><span class="text-zinc-500">Vehicle info (VIN)</span></div>
+        <div class="flex justify-between py-1 border-b border-zinc-800"><span class="text-zinc-400">22</span><span class="text-zinc-500">Extended PIDs</span></div>
+        <div class="flex justify-between py-1 border-b border-zinc-800"><span class="text-zinc-400">AT</span><span class="text-zinc-500">ELM327 commands</span></div>
+        <div class="flex justify-between py-1"><span class="text-zinc-400">ST</span><span class="text-zinc-500">STN commands</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="text-center py-4 text-xs text-zinc-600 border-t border-zinc-800">
+    CarPi v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
+  </div>
+
+  <script>
+    const terminal = document.getElementById('terminal');
+    const input = document.getElementById('cmd-input');
+    const sendBtn = document.getElementById('send-btn');
+    const history = [];
+    let historyIndex = -1;
+
+    function appendLine(text, cls) {
+      const line = document.createElement('div');
+      line.className = cls || '';
+      line.textContent = text;
+      terminal.appendChild(line);
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+
+    function clearTerminal() {
+      terminal.innerHTML = '';
+      appendLine('Terminal cleared.', 'info');
+    }
+
+    async function checkStatus() {
+      try {
+        const r = await fetch('/api/status');
+        const d = await r.json();
+        const dot = document.getElementById('dev-dot');
+        const status = document.getElementById('dev-status');
+        if (d.connected) {
+          dot.style.background = '#22c55e';
+          dot.style.boxShadow = '0 0 6px #22c55e';
+          status.textContent = 'Connected to OBD adapter';
+          status.className = 'text-xs text-emerald-400';
+        } else {
+          dot.style.background = '#ef4444';
+          dot.style.boxShadow = '0 0 6px #ef4444';
+          status.textContent = d.status || 'Disconnected';
+          status.className = 'text-xs text-red-400';
+        }
+      } catch(e) {}
+    }
+
+    async function sendCommand() {
+      const cmd = input.value.trim();
+      if (!cmd) return;
+
+      history.unshift(cmd);
+      historyIndex = -1;
+      input.value = '';
+
+      appendLine('> ' + cmd, 'cmd');
+      sendBtn.textContent = '...';
+      input.disabled = true;
+
+      try {
+        const r = await fetch('/api/dev/command', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({command: cmd})
+        });
+        const d = await r.json();
+
+        if (d.ok) {
+          if (d.response) {
+            d.response.split('\\n').forEach(line => {
+              if (line.trim()) appendLine(line.trim(), 'resp');
+            });
+          } else {
+            appendLine('(empty response)', 'info');
+          }
+        } else {
+          appendLine('ERROR: ' + (d.error || 'Unknown error'), 'err');
+        }
+      } catch(e) {
+        appendLine('ERROR: ' + e.message, 'err');
+      }
+
+      sendBtn.textContent = 'Send';
+      input.disabled = false;
+      input.focus();
+    }
+
+    function sendQuick(cmd) {
+      input.value = cmd;
+      sendCommand();
+    }
+
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendCommand();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (historyIndex < history.length - 1) {
+          historyIndex++;
+          input.value = history[historyIndex];
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (historyIndex > 0) {
+          historyIndex--;
+          input.value = history[historyIndex];
+        } else {
+          historyIndex = -1;
+          input.value = '';
+        }
+      }
+    });
+
+    appendLine('CarPi Dev Console ready.', 'info');
+    appendLine('Type an OBD command (e.g. 010C) or ELM327 command (e.g. ATZ) and press Enter.', 'info');
+    checkStatus();
+    setInterval(checkStatus, 5000);
+    input.focus();
+  </script>
+</body>
+</html>
+"""
+
+
+@app.route("/dev")
+def dev_page():
+    return render_template_string(
+        DEV_HTML,
+        ip=config.HOTSPOT_IP,
+        port=config.WEB_PORT,
+        accent_hex=config.get_theme()["accent"],
+        version=config.APP_VERSION,
+    )
+
+
+@app.route("/api/dev/command", methods=["POST"])
+def api_dev_command():
+    body = request.get_json(silent=True)
+    if not body or "command" not in body:
+        return jsonify({"ok": False, "error": "Missing 'command' in request body"}), 400
+    result = obd_reader.send_raw_command(body["command"])
     return jsonify(result)
 
 
