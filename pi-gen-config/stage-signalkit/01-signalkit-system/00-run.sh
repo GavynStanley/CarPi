@@ -209,8 +209,13 @@ hdmi_drive=2
 # Disable overscan (black borders) — our display fills edge-to-edge
 disable_overscan=1
 
-# GPU memory — Kivy needs enough VRAM for OpenGL ES rendering
+# GPU memory — enough VRAM for WebKit/X11 rendering
 gpu_mem=128
+
+# Disable HDMI CEC — prevents external devices from sending
+# power-off/standby commands that blank the display
+hdmi_ignore_cec_init=1
+hdmi_ignore_cec=1
 
 # Disable the rainbow splash screen and text during boot for a cleaner startup
 disable_splash=1

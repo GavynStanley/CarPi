@@ -28,7 +28,16 @@ ExecStartPost=/bin/bash -c '\
   DISPLAY=:0 xsetroot -solid "#111111" 2>/dev/null; \
   DISPLAY=:0 xset s off 2>/dev/null; \
   DISPLAY=:0 xset -dpms 2>/dev/null; \
-  DISPLAY=:0 xset s noblank 2>/dev/null'
+  DISPLAY=:0 xset s noblank 2>/dev/null; \
+  echo 0 > /sys/module/kernel/parameters/consoleblank 2>/dev/null; \
+  setterm --blank 0 --powerdown 0 > /dev/tty1 2>/dev/null; \
+  setterm --blank 0 --powerdown 0 > /dev/tty7 2>/dev/null; \
+  while true; do \
+    sleep 60; \
+    DISPLAY=:0 xset s off 2>/dev/null; \
+    DISPLAY=:0 xset -dpms 2>/dev/null; \
+    DISPLAY=:0 xset s noblank 2>/dev/null; \
+  done &'
 Restart=always
 RestartSec=3
 
