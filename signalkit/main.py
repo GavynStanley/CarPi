@@ -67,6 +67,11 @@ _shutdown_event = threading.Event()
 def _handle_signal(signum, frame):
     """Gracefully handle SIGTERM/SIGINT (e.g., systemd stop, Ctrl+C)."""
     logger.info(f"Received signal {signum} — shutting down")
+    # Show shutdown splash on HDMI before anything else stops
+    try:
+        display.show_shutdown_screen()
+    except Exception:
+        pass
     _shutdown_event.set()
 
 
@@ -236,6 +241,11 @@ def main():
     # --- Shutdown ---
     logger.info("Display exited — shutting down")
     _shutdown_event.set()
+
+    # If SIGTERM triggered shutdown, the splash is already showing.
+    # Give it a moment to render before we tear things down.
+    if _shutdown_event.is_set():
+        time.sleep(2)
 
     # Stop the BT PAN manager
     if pan_manager:

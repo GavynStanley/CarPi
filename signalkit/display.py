@@ -909,6 +909,79 @@ def notify_config_changed():
     _on_setting_changed_handler()
 
 
+def show_shutdown_screen():
+    """Replace the dashboard with a shutdown splash so the user never sees console logs."""
+    if not _window:
+        return
+    theme = app_config.get_theme()
+    accent = theme["accent"]
+    glow = theme["glow"]
+    html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    background: #0a0a0a; color: #ffffff;
+    width: 800px; height: 480px; overflow: hidden; cursor: none;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    -webkit-font-smoothing: antialiased;
+  }}
+  .ring {{
+    position: absolute;
+    width: 60px; height: 60px;
+    border: 2px solid {accent};
+    border-radius: 50%;
+    opacity: 0;
+    animation: ring-expand 2s ease-out forwards;
+  }}
+  @keyframes ring-expand {{
+    0% {{ transform: scale(0.5); opacity: 0.6; }}
+    100% {{ transform: scale(4); opacity: 0; }}
+  }}
+  .dot {{
+    width: 8px; height: 8px;
+    background: {accent};
+    border-radius: 50%;
+    box-shadow: 0 0 15px {accent}, 0 0 30px {glow};
+    margin-bottom: 20px;
+    animation: dot-fade 1.5s ease-in-out infinite;
+  }}
+  @keyframes dot-fade {{
+    0%, 100% {{ opacity: 1; transform: scale(1); }}
+    50% {{ opacity: 0.4; transform: scale(0.8); }}
+  }}
+  .title {{
+    font-size: 14px; font-weight: 600;
+    letter-spacing: 3px; text-transform: uppercase;
+    color: #71717a;
+    margin-bottom: 6px;
+  }}
+  .sub {{
+    font-size: 11px; color: #3f3f46;
+    animation: fade-in 0.5s ease-out 0.3s both;
+  }}
+  @keyframes fade-in {{ to {{ opacity: 1; }} }}
+  .fade-out {{
+    animation: page-fade 1s ease-out 2s forwards;
+  }}
+  @keyframes page-fade {{
+    to {{ opacity: 0; }}
+  }}
+</style></head>
+<body class="fade-out">
+  <div class="ring"></div>
+  <div class="dot"></div>
+  <div class="title">Shutting Down</div>
+  <div class="sub" style="opacity:0">See you next drive</div>
+</body></html>"""
+    try:
+        _window.load_html(html)
+    except Exception:
+        pass
+
+
 def stop_display():
     """Stop the display from another thread."""
     global _window

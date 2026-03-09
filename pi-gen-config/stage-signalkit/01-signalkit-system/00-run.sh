@@ -217,6 +217,11 @@ gpu_mem=128
 hdmi_ignore_cec_init=1
 hdmi_ignore_cec=1
 
+# Never cut the HDMI signal — prevents "no signal" on the display.
+# 0 = HDMI output stays active even when DPMS/screensaver triggers.
+# Without this, the GPU firmware can power off the HDMI port entirely.
+hdmi_blanking=0
+
 # Disable the rainbow splash screen and text during boot for a cleaner startup
 disable_splash=1
 
