@@ -217,15 +217,28 @@ quit
             timeout=30
         )
         output = proc.stdout + proc.stderr
-        logger.debug(f"bluetoothctl output: {output}")
+        logger.info(f"bluetoothctl output:\n{output.strip()}")
 
-        if "successful" in output.lower() or "already paired" in output.lower():
+        lower = output.lower()
+
+        # Check for hard failures first
+        if "not available" in lower:
+            logger.error("Bluetooth controller not available")
+            return False
+        if "device not found" in lower or "not found" in lower:
+            logger.error(f"Bluetooth device {mac} not found — is it powered on and in range?")
+            return False
+        if "failed" in lower and "already paired" not in lower:
+            logger.error(f"Bluetooth pairing failed — see output above")
+            return False
+
+        if "successful" in lower or "already paired" in lower or "pairing successful" in lower:
             logger.info("Bluetooth pairing successful")
             return True
-        else:
-            # Not necessarily an error — device may already be paired
-            logger.warning("bluetoothctl completed but result unclear")
-            return True
+
+        # If we got here, device might already be paired/trusted — check
+        logger.info("bluetoothctl completed — assuming device is ready")
+        return True
     except subprocess.TimeoutExpired:
         logger.error("bluetoothctl timed out during pairing")
         return False
