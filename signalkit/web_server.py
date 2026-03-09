@@ -784,11 +784,11 @@ SETTINGS_HTML = """<!DOCTYPE html>
         list.innerHTML = data.devices.map(d => {
           const isSelected = d.mac.toUpperCase() === currentMac.toUpperCase();
           return `<button type="button" onclick="btSelect('${d.mac}','${d.name.replace(/'/g, "\\'")}')"
-            class="w-full flex items-center gap-2.5 bg-black/30 border rounded-lg px-3 py-2.5 text-left transition-all
-              ${isSelected ? 'border-acc bg-acc/10' : 'border-zinc-700 hover:border-zinc-500'}">
-            <svg class="w-4 h-4 ${isSelected ? 'text-acc' : 'text-zinc-600'} shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
+            class="w-full flex items-center gap-2.5 ${d.obd ? 'bg-acc/5' : 'bg-black/30'} border rounded-lg px-3 py-2.5 text-left transition-all
+              ${isSelected ? 'border-acc bg-acc/10' : d.obd ? 'border-acc/30 hover:border-acc/50' : 'border-zinc-700 hover:border-zinc-500'}">
+            <svg class="w-4 h-4 ${isSelected || d.obd ? 'text-acc' : 'text-zinc-600'} shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium truncate">${d.name}</div>
+              <div class="text-sm font-medium truncate">${d.name}${d.obd ? ' <span class="inline-block text-[0.6rem] font-bold bg-acc/20 text-acc px-1.5 py-0.5 rounded ml-1.5 align-middle">OBD</span>' : ''}</div>
               <div class="text-xs font-mono text-zinc-500">${d.mac}</div>
             </div>
             ${isSelected ? '<span class="text-[0.6rem] font-bold text-acc bg-acc/15 px-2 py-0.5 rounded">SELECTED</span>' : ''}
@@ -1215,11 +1215,53 @@ DIAGNOSTICS_HTML = """<!DOCTYPE html>
     </div>
   </div>
 
+    <!-- Bluetooth Logs -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-3.5">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-base font-bold flex items-center gap-2">
+          <svg class="w-4 h-4 text-acc" fill="currentColor" viewBox="0 0 24 24"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
+          Bluetooth Logs
+        </h2>
+        <button onclick="loadBtLogs()" class="text-xs text-acc hover:opacity-80 font-semibold">Refresh</button>
+      </div>
+      <div id="bt-logs" class="bg-black/40 border border-zinc-800 rounded-lg p-3 max-h-[300px] overflow-y-auto font-mono text-[0.7rem] leading-relaxed text-zinc-400 space-y-0.5">
+        Loading...
+      </div>
+    </div>
+  </div>
+
   <div class="text-center py-4 text-xs text-zinc-600 border-t border-zinc-800">
     SignalKit v{{ version }} &middot; <a href="/" class="text-zinc-400 hover:text-acc">Dashboard</a> &middot; {{ ip }}:{{ port }}
   </div>
 
   <script>
+    async function loadBtLogs() {
+      try {
+        const r = await fetch('/api/bt-logs');
+        const d = await r.json();
+        const el = document.getElementById('bt-logs');
+        if (d.ok && d.lines.length > 0) {
+          el.innerHTML = d.lines.map(line => {
+            let cls = 'text-zinc-500';
+            if (line.includes('ERROR') || line.includes('error') || line.includes('Failed'))
+              cls = 'text-red-400';
+            else if (line.includes('WARNING') || line.includes('warning') || line.includes('timeout'))
+              cls = 'text-amber-400';
+            else if (line.includes('Connected') || line.includes('success') || line.includes('bound'))
+              cls = 'text-emerald-400';
+            else if (line.includes('INFO'))
+              cls = 'text-zinc-400';
+            return `<div class="${cls}">${line.replace(/</g, '&lt;')}</div>`;
+          }).join('');
+          el.scrollTop = el.scrollHeight;
+        } else {
+          el.innerHTML = '<div class="text-zinc-600">No Bluetooth logs available</div>';
+        }
+      } catch(e) {
+        document.getElementById('bt-logs').innerHTML = '<div class="text-red-400">Failed to load logs</div>';
+      }
+    }
+
     async function loadDiagnostics() {
       try {
         const r = await fetch('/api/diagnostics');
@@ -1271,7 +1313,9 @@ DIAGNOSTICS_HTML = """<!DOCTYPE html>
     }
 
     loadDiagnostics();
+    loadBtLogs();
     setInterval(loadDiagnostics, 5000);
+    setInterval(loadBtLogs, 10000);
   </script>
 </body>
 </html>
@@ -1477,10 +1521,10 @@ SETUP_HTML = """<!DOCTYPE html>
 
         list.innerHTML = data.devices.map(d => `
           <button onclick="selectAdapter('${d.mac}','${d.name.replace(/'/g, "\\\\'")}')" data-mac="${d.mac}"
-            class="w-full flex items-center gap-2.5 bg-black/30 border border-zinc-700 rounded-xl px-3.5 py-3 text-left transition-all hover:border-zinc-500">
-            <svg class="w-5 h-5 text-zinc-600 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
+            class="w-full flex items-center gap-2.5 ${d.obd ? 'bg-acc/5 border-acc/30' : 'bg-black/30 border-zinc-700'} border rounded-xl px-3.5 py-3 text-left transition-all hover:border-zinc-500">
+            <svg class="w-5 h-5 ${d.obd ? 'text-acc' : 'text-zinc-600'} shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/></svg>
             <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium truncate">${d.name}</div>
+              <div class="text-sm font-medium truncate">${d.name}${d.obd ? ' <span class="inline-block text-[0.6rem] font-bold bg-acc/20 text-acc px-1.5 py-0.5 rounded ml-1.5 align-middle">OBD</span>' : ''}</div>
               <div class="text-xs font-mono text-zinc-500">${d.mac}</div>
             </div>
           </button>
@@ -1953,7 +1997,7 @@ def pwa_icon():
 
 def _needs_setup() -> bool:
     """Check if the setup wizard should be shown."""
-    return not config.SETUP_COMPLETE and config.OBD_MAC == "AA:BB:CC:DD:EE:FF"
+    return not config.SETUP_COMPLETE
 
 
 @app.route("/setup")
@@ -2072,6 +2116,34 @@ def api_data():
     return jsonify(obd_reader.get_data())
 
 
+@app.route("/api/bt-logs")
+def api_bt_logs():
+    """Return recent Bluetooth-related log lines from journald and SignalKit."""
+    lines = []
+    try:
+        # Get SignalKit logs mentioning bluetooth/rfcomm/obd/connect
+        r = subprocess.run(
+            ["journalctl", "-u", "signalkit", "-u", "signalkit-rfcomm",
+             "-u", "bluetooth", "--no-pager", "-n", "200", "--output", "short-monotonic"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode == 0:
+            bt_keywords = ["bluetooth", "rfcomm", "obd", "bt_pan", "bluez",
+                           "connect", "disconnect", "pair", "adapter", "hci",
+                           "rfkill", "serial", "bound", "channel"]
+            for line in r.stdout.splitlines():
+                lower = line.lower()
+                if any(kw in lower for kw in bt_keywords):
+                    # Trim the hostname prefix for cleaner output
+                    parts = line.split(": ", 1)
+                    lines.append(parts[-1] if len(parts) > 1 else line)
+            # Keep last 50 relevant lines
+            lines = lines[-50:]
+    except Exception as e:
+        lines = [f"Error reading logs: {e}"]
+    return jsonify({"ok": True, "lines": lines})
+
+
 @app.route("/api/stream")
 def api_stream():
     return Response(
@@ -2129,6 +2201,21 @@ def api_bt_scan():
         return jsonify({"ok": False, "error": str(e)})
 
 
+# Keywords that indicate a device is likely an OBD2 adapter
+_OBD_KEYWORDS = [
+    "obd", "obdii", "obd2", "elm327", "elm 327", "veepeak", "vepeak",
+    "v-link", "vlink", "vgate", "konnwei", "kw", "carista", "fixd",
+    "bluedriver", "bafx", "scan", "scanner", "autoenginuity", "torque",
+    "icar", "xtool", "thinkcar", "launch", "autel",
+]
+
+
+def _is_likely_obd(name):
+    """Check if a device name looks like an OBD2 adapter."""
+    lower = name.lower()
+    return any(kw in lower for kw in _OBD_KEYWORDS)
+
+
 def _bt_scan_linux():
     """Scan using bluetoothctl (Raspberry Pi / Linux)."""
     # Ensure Bluetooth is unblocked and powered on
@@ -2161,7 +2248,10 @@ def _bt_scan_linux():
             name = parts[2] if len(parts) >= 3 else mac
             if mac and mac not in seen:
                 seen.add(mac)
-                devices.append({"mac": mac, "name": name})
+                is_obd = _is_likely_obd(name) if name else False
+                devices.append({"mac": mac, "name": name, "obd": is_obd})
+    # Sort: OBD adapters first, then alphabetically by name
+    devices.sort(key=lambda d: (not d.get("obd", False), (d.get("name") or "").lower()))
     return jsonify({"ok": True, "devices": devices})
 
 

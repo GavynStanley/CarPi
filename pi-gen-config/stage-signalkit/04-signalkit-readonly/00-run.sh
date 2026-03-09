@@ -69,23 +69,39 @@ cat >> "${ROOTFS_DIR}/etc/fstab" << 'FSTAB'
 
 # SignalKit: tmpfs mounts for read-only root compatibility
 # These directories need to be writable at runtime.
+# Note: /var/log is NOT tmpfs — it's bind-mounted from /boot/firmware
+# for persistent journal logs (see section 3 below).
 tmpfs   /tmp        tmpfs   defaults,noatime,nosuid,size=64m    0 0
 tmpfs   /var/tmp    tmpfs   defaults,noatime,nosuid,size=32m    0 0
-tmpfs   /var/log    tmpfs   defaults,noatime,nosuid,size=32m    0 0
 FSTAB
 
 # ---------------------------------------------------------------------------
-# 3. Configure journald to use RAM (not disk) for logs
+# 3. Configure journald for persistent logs across reboots
 # ---------------------------------------------------------------------------
-# With a read-only root, systemd-journald can't write to /var/log/journal
-# on disk. Configure it to use volatile (RAM) storage instead.
+# With overlayfs on /, /var/log/journal is lost on reboot. We bind-mount
+# a log directory from /boot/firmware (the writable FAT32 boot partition)
+# so logs survive reboots and can be read for debugging.
+
+# Create the persistent log directory on the boot partition
+install -d "${ROOTFS_DIR}/boot/firmware/signalkit-logs"
+install -d "${ROOTFS_DIR}/var/log/journal"
+
+# Add a bind mount so journald writes to the boot partition
+cat >> "${ROOTFS_DIR}/etc/fstab" << 'FSTAB'
+
+# SignalKit: persistent logs on the writable boot partition
+/boot/firmware/signalkit-logs  /var/log/journal  none  bind,nofail  0 0
+FSTAB
+
 install -d "${ROOTFS_DIR}/etc/systemd/journald.conf.d"
-cat > "${ROOTFS_DIR}/etc/systemd/journald.conf.d/signalkit-volatile.conf" << 'EOF'
+cat > "${ROOTFS_DIR}/etc/systemd/journald.conf.d/signalkit-persistent.conf" << 'EOF'
 [Journal]
-# Store logs in RAM — lost on reboot, but that's acceptable for an embedded device.
-# Increase RateLimitBurst to avoid dropping SignalKit log messages.
-Storage=volatile
-RuntimeMaxUse=16M
+# Persist logs to disk so they survive reboots.
+# /var/log/journal is bind-mounted to /boot/firmware/signalkit-logs
+# which lives on the writable FAT32 boot partition.
+Storage=persistent
+SystemMaxUse=32M
+SystemMaxFiles=5
 RateLimitInterval=30s
 RateLimitBurst=1000
 EOF
