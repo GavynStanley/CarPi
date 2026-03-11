@@ -22,8 +22,15 @@ plymouth
 plymouth-themes
 
 # --- Qt6 / QML display (EGLFS — direct framebuffer, no X11 needed) ---
-# PySide6 is installed via pip (includes Qt runtime + QML engine).
-# These system packages provide the EGLFS backend dependencies:
+# PyQt6 from system apt (PySide6 has no aarch64 Linux wheels on PyPI).
+python3-pyqt6
+qml6-module-qtquick
+qml6-module-qtquick-controls
+qml6-module-qtquick-layouts
+qml6-module-qtquick-window
+qml6-module-qtquick-templates
+qml6-module-qtqml-workerscript
+# EGLFS backend dependencies:
 libgles2-mesa
 libegl1-mesa
 libgbm1

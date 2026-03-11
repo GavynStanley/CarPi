@@ -1,7 +1,8 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Effects
+import "components"
+import "views"
 
 ApplicationWindow {
     id: root
@@ -84,19 +85,37 @@ ApplicationWindow {
         }
     }
 
-    // -- Top status bar (matches settings/dev header style) --
+    // -- Top bar: view title left, status + clock right --
+    property string viewTitle: {
+        if (currentView === "dashboard") return "DASHBOARD"
+        if (currentView === "settings") return "SETTINGS"
+        if (currentView === "dev") return "DEV CONSOLE"
+        return ""
+    }
+
     Rectangle {
         id: topBar
         anchors.left: dock.right; anchors.right: parent.right; anchors.top: parent.top
         height: 36; color: "transparent"; z: 5
         Rectangle { width: parent.width; height: 1; anchors.bottom: parent.bottom; color: "#27272a" }
 
+        // View title (left)
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.left: parent.left; anchors.leftMargin: 16
+            text: root.viewTitle
+            font.pixelSize: 11; font.weight: Font.Bold; font.letterSpacing: 2
+            color: "#71717a"
+            visible: root.viewTitle !== ""
+        }
+
+        // Status + clock (right)
         Row {
-            anchors.centerIn: parent
+            anchors.verticalCenter: parent.verticalCenter
+            anchors.right: parent.right; anchors.rightMargin: 16
             spacing: 8
-            Rectangle {
-                width: 6; height: 6; radius: 3
-                color: bridge.obdConnected ? "#22c55e" : "#ef4444"
+            StatusDot {
+                connected: bridge.obdConnected
                 anchors.verticalCenter: parent.verticalCenter
             }
             Text {

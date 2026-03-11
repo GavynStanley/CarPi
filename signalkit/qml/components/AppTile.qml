@@ -3,7 +3,7 @@ import QtQuick.Layouts
 
 Item {
     id: tile
-    width: 76; height: 82
+    width: 120; height: 120
 
     property string label: ""
     property color gradStart: "#1c1c1e"
@@ -15,11 +15,11 @@ Item {
 
     Column {
         anchors.horizontalCenter: parent.horizontalCenter
-        spacing: 8
+        spacing: 10
 
         Rectangle {
             id: iconRect
-            width: 60; height: 60; radius: 14
+            width: 88; height: 88; radius: 20
             border.width: 1; border.color: tile.borderColor
 
             gradient: Gradient {
@@ -30,7 +30,7 @@ Item {
             Image {
                 anchors.centerIn: parent
                 source: tile.iconSource
-                sourceSize: Qt.size(24, 24)
+                sourceSize: Qt.size(36, 36)
                 smooth: true
             }
 
@@ -49,7 +49,7 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             text: tile.label
-            font.pixelSize: 10
+            font.pixelSize: 11
             font.weight: Font.DemiBold
             color: "#a1a1aa"
         }

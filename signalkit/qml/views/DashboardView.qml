@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "../components"
 
 Item {
     id: dashRoot
@@ -8,25 +9,6 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-
-        // Status bar
-        Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 26
-            color: "#18181b"
-            Rectangle { width: parent.width; height: 1; anchors.bottom: parent.bottom; color: "#27272a" }
-
-            RowLayout {
-                anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 10
-                spacing: 6
-                Rectangle { width: 7; height: 7; radius: 3.5; color: "#22c55e" }
-                Text { text: "Connected — Demo Mode"; font.pixelSize: 11; color: "#71717a" }
-                Item { Layout.fillWidth: true }
-                Text { text: "0:42"; font.pixelSize: 10; color: "#52525b"; font.features: {"tnum": 1} }
-                Text { text: "12.3 mi"; font.pixelSize: 10; color: "#52525b"; font.features: {"tnum": 1} }
-                Rectangle { width: 1; height: 12; color: "#3f3f46" }
-                Text { text: bridge.clockText; font.pixelSize: 11; color: "#52525b"; font.features: {"tnum": 1} }
-            }
-        }
 
         // Dashboard grid
         Item {

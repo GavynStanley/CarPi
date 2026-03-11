@@ -12,21 +12,31 @@ import os
 import sys
 from datetime import datetime
 
-# ── Qt plugin path fix ──────────────────────────────────────────────
-# Must happen at the C level before ANY Qt import touches the plugin loader.
-import ctypes, ctypes.util
-_libc = ctypes.CDLL(ctypes.util.find_library("c"))
+# ── Qt backend: PySide6 (macOS dev) or PyQt6 (Raspberry Pi) ──────
+try:
+    # PySide6 — macOS dev (pip-installed, needs plugin path fix)
+    import ctypes, ctypes.util
+    _libc = ctypes.CDLL(ctypes.util.find_library("c"))
+    import PySide6 as _pyside6
+    _qt_plugins = os.path.join(os.path.dirname(_pyside6.__file__), "Qt", "plugins")
+    _libc.setenv(b"QT_PLUGIN_PATH", _qt_plugins.encode(), ctypes.c_int(1))
+    os.environ["QT_PLUGIN_PATH"] = _qt_plugins
+    del _libc, _qt_plugins, _pyside6
 
-import PySide6 as _pyside6
-_qt_plugins = os.path.join(os.path.dirname(_pyside6.__file__), "Qt", "plugins")
-_libc.setenv(b"QT_PLUGIN_PATH", _qt_plugins.encode(), ctypes.c_int(1))
-os.environ["QT_PLUGIN_PATH"] = _qt_plugins
-del _libc, _qt_plugins
-# ────────────────────────────────────────────────────────────────────
+    from PySide6.QtCore import QObject, Property, Signal, QTimer, QUrl
+    from PySide6.QtGui import QGuiApplication
+    from PySide6.QtQml import QQmlApplicationEngine
+    _BACKEND = "PySide6"
 
-from PySide6.QtCore import QObject, Property, Signal, QTimer, QUrl
-from PySide6.QtGui import QGuiApplication
-from PySide6.QtQml import QQmlApplicationEngine
+except ImportError:
+    # PyQt6 — Raspberry Pi (system packages via apt)
+    from PyQt6.QtCore import QObject, QTimer, QUrl
+    from PyQt6.QtCore import pyqtProperty as Property
+    from PyQt6.QtCore import pyqtSignal as Signal
+    from PyQt6.QtGui import QGuiApplication
+    from PyQt6.QtQml import QQmlApplicationEngine
+    _BACKEND = "PyQt6"
+# ──────────────────────────────────────────────────────────────────
 
 
 class Bridge(QObject):
@@ -89,6 +99,7 @@ def main():
     icons_dir = QUrl.fromLocalFile(os.path.join(qml_dir, "icons") + "/")
     engine.rootContext().setContextProperty("iconsPath", icons_dir.toString())
 
+    print(f"SignalKit starting (Qt backend: {_BACKEND})")
     engine.load(QUrl.fromLocalFile(qml_path))
 
     if not engine.rootObjects():

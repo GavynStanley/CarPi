@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "../components"
 
 Item {
     id: devRoot
@@ -9,32 +10,7 @@ Item {
         anchors.fill: parent
         spacing: 0
 
-        // Header
-        Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 36
-            color: "transparent"
-            Rectangle { width: parent.width; height: 1; anchors.bottom: parent.bottom; color: "#27272a" }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left; anchors.leftMargin: 16
-                text: "DEV CONSOLE"
-                font.pixelSize: 11; font.weight: Font.Bold; font.letterSpacing: 2
-                color: "#71717a"
-            }
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                anchors.right: parent.right; anchors.rightMargin: 16
-                text: "Clear"
-                font.pixelSize: 10; color: "#52525b"
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: terminalModel.clear()
-                }
-            }
-        }
-
-        // Quick commands
+        // Quick commands + Clear
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 38
             color: "transparent"
@@ -46,24 +22,26 @@ Item {
                 spacing: 5
                 Repeater {
                     model: ["ATZ", "ATI", "ATRV", "0100", "0105", "010C", "010D", "03"]
-                    Rectangle {
+                    PillButton {
                         required property string modelData
-                        width: cmdText.width + 16; height: 24; radius: 8
-                        color: "#18181b"; border.width: 1; border.color: "#27272a"
-                        Text {
-                            id: cmdText; anchors.centerIn: parent
-                            text: modelData
-                            font.pixelSize: 10; font.weight: Font.DemiBold; font.family: "Menlo"
-                            color: "#a1a1aa"
-                        }
-                        MouseArea {
-                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                terminalModel.append({"text": "> " + modelData, "type": "cmd"})
-                                terminalModel.append({"text": "41 0C 0C 8A", "type": "resp"})
-                            }
+                        text: modelData
+                        onClicked: {
+                            terminalModel.append({"text": "> " + modelData, "type": "cmd"})
+                            terminalModel.append({"text": "41 0C 0C 8A", "type": "resp"})
                         }
                     }
+                }
+            }
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.right: parent.right; anchors.rightMargin: 12
+                text: "Clear"
+                font.pixelSize: 10; color: "#52525b"
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: terminalModel.clear()
                 }
             }
         }

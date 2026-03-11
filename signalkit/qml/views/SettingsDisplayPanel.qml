@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "../components"
 
 Flickable {
     id: displayPanel
@@ -11,8 +12,9 @@ Flickable {
 
     Column {
         id: col
-        width: parent.width
-        padding: 16
+        anchors.left: parent.left; anchors.leftMargin: 16
+        anchors.right: parent.right; anchors.rightMargin: 16
+        width: parent.width - 32
         spacing: 4
 
         SettingsSectionLabel { text: "THEME COLOR" }

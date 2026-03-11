@@ -49,13 +49,16 @@ echo "SignalKit installed to /opt/signalkit"
 # ---------------------------------------------------------------------------
 # 2. Install Python dependencies
 # ---------------------------------------------------------------------------
+# PyQt6 is installed via apt (see 00-packages). Only pip-install what apt lacks.
 on_chroot << 'EOF'
-echo "Installing Python packages: obd flask PySide6"
-python3 -m pip install --break-system-packages obd flask PySide6 2>/dev/null \
-    || python3 -m pip install obd flask PySide6
+echo "Installing Python packages: obd flask"
+python3 -m pip install --break-system-packages obd flask 2>/dev/null \
+    || python3 -m pip install obd flask
 
 echo "Python packages installed:"
-python3 -m pip show obd flask PySide6 | grep -E "^(Name|Version):"
+python3 -m pip show obd flask | grep -E "^(Name|Version):"
+echo "PyQt6 (system):"
+python3 -c "import PyQt6.QtCore; print('  PyQt6', PyQt6.QtCore.PYQT_VERSION_STR)"
 EOF
 
 # ---------------------------------------------------------------------------

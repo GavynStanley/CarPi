@@ -21,7 +21,7 @@ Item {
         }
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            anchors.right: parent.right
+            anchors.right: parent.right; anchors.rightMargin: 16
             text: row.valueText
             font.pixelSize: 10; font.family: "Menlo"
             color: "#71717a"

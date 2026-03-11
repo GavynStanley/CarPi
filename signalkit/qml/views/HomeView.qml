@@ -1,17 +1,19 @@
 import QtQuick
 import QtQuick.Layouts
+import "../components"
 
 Item {
     id: homeRoot
     property color accent: "#3b82f6"
     signal navigate(string view)
 
-    // Centered app grid
+    // Top-left aligned app grid — CarPlay style
     Grid {
-        anchors.centerIn: parent
-        columns: 4
-        columnSpacing: 32
-        rowSpacing: 24
+        anchors.top: parent.top; anchors.topMargin: 24
+        anchors.left: parent.left; anchors.leftMargin: 24
+        columns: 5
+        columnSpacing: 16
+        rowSpacing: 16
 
         AppTile {
             label: "Dashboard"
@@ -43,5 +45,4 @@ Item {
             onClicked: {}
         }
     }
-
 }
