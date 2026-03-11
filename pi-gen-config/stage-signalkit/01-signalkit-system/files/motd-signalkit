@@ -93,9 +93,9 @@ if mount | grep -q 'on / .*overlay'; then
     RO_COLOR="$G"
 fi
 
-# Dashboard IP
-DASH_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
-[ -z "$DASH_IP" ] && DASH_IP="192.168.4.1"
+# Dashboard URL — use hotspot IP directly (no DNS on the hotspot network)
+DASH_HOST=$(ip -4 addr show wlan0 2>/dev/null | awk '/inet / {print $2}' | cut -d/ -f1)
+[ -z "$DASH_HOST" ] && DASH_HOST="192.168.4.1"
 
 # Print banner
 printf "\n"
@@ -121,7 +121,7 @@ printf "${IP_LINES}"
 printf "\n"
 printf "  ${W}SignalKit${NC}\n"
 printf "    Service:     ${SK_COLOR}%s${NC}\n" "$SK_STATUS"
-printf "    Dashboard:   http://%s:%s\n" "$DASH_IP" "$WEB_PORT"
+printf "    Dashboard:   http://%s:%s\n" "$DASH_HOST" "$WEB_PORT"
 printf "    Hotspot:     %s / %s\n" "$HOTSPOT_SSID" "$HOTSPOT_PASS"
 printf "    OBD Adapter: %s\n" "$OBD_MAC"
 printf "    Setup Done:  %s\n" "$SETUP_DONE"

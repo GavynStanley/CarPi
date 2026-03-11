@@ -830,6 +830,20 @@ SETTINGS_HTML = """<!DOCTYPE html>
           b.className = b.className.replace('border-acc bg-acc/10', 'border-zinc-700 hover:border-zinc-500');
         }
       });
+      // Pair immediately while device is still discoverable
+      try {
+        const pairResp = await fetch('/api/bt-pair', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mac }),
+        });
+        const pairData = await pairResp.json();
+        if (!pairData.ok) {
+          console.warn('Pairing warning:', pairData.error);
+        }
+      } catch(e) {
+        console.warn('Pairing error:', e);
+      }
       await saveSetting('OBD_MAC');
     }
 
@@ -1568,8 +1582,8 @@ SETUP_HTML = """<!DOCTYPE html>
       }
     }
 
-    function selectAdapter(mac, name) {
-      selectedMac = mac;
+    async function selectAdapter(mac, name) {
+      // Highlight selected adapter
       document.querySelectorAll('#setup-devices button').forEach(b => {
         if (b.dataset.mac === mac) {
           b.className = b.className.replace('border-zinc-700', 'border-acc bg-acc/10');
@@ -1579,7 +1593,39 @@ SETUP_HTML = """<!DOCTYPE html>
           b.querySelector('svg').className = 'w-5 h-5 text-zinc-600 shrink-0';
         }
       });
-      document.getElementById('setup-next-2').disabled = false;
+
+      // Pair immediately while device is still discoverable
+      const errDiv = document.getElementById('setup-bt-error');
+      errDiv.classList.add('hidden');
+      const btn = document.querySelector(`[data-mac="${mac}"]`);
+      if (btn) {
+        const origText = btn.querySelector('.text-sm').innerHTML;
+        btn.querySelector('.text-sm').innerHTML = 'Pairing...';
+        btn.disabled = true;
+        try {
+          const resp = await fetch('/api/bt-pair', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mac }),
+          });
+          const data = await resp.json();
+          btn.disabled = false;
+          if (data.ok) {
+            btn.querySelector('.text-sm').innerHTML = origText.replace(name, name + ' <span class="inline-block text-[0.6rem] font-bold bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded ml-1.5 align-middle">PAIRED</span>');
+            selectedMac = mac;
+            document.getElementById('setup-next-2').disabled = false;
+          } else {
+            btn.querySelector('.text-sm').innerHTML = origText;
+            errDiv.textContent = data.error || 'Pairing failed. Make sure the adapter is on.';
+            errDiv.classList.remove('hidden');
+          }
+        } catch(e) {
+          btn.disabled = false;
+          btn.querySelector('.text-sm').innerHTML = origText;
+          errDiv.textContent = 'Network error during pairing.';
+          errDiv.classList.remove('hidden');
+        }
+      }
     }
 
     async function finishSetup() {
@@ -2338,36 +2384,30 @@ def _bt_scan_linux():
     devices = []
     seen = set()
 
-    # --- Classic Bluetooth scan via hcitool (finds OBD adapters) ---
+    # --- Classic Bluetooth scan via hcitool scan (finds OBD adapters) ---
+    # Uses 'scan' instead of 'inq' — some OBD adapters don't respond to
+    # raw inquiry but DO respond to a full scan with name resolution.
     try:
-        logger.info("Starting classic BT scan (hcitool inq)...")
+        logger.info("Starting classic BT scan (hcitool scan)...")
         proc = subprocess.run(
-            ["hcitool", "inq", "--length=8", "--flush"],
-            capture_output=True, text=True, timeout=20,
+            ["hcitool", "scan", "--flush"],
+            capture_output=True, text=True, timeout=30,
         )
-        logger.info(f"hcitool inq output: {proc.stdout.strip()}")
+        logger.info(f"hcitool scan output: {proc.stdout.strip()}")
         for line in proc.stdout.splitlines():
             line = line.strip()
-            # Format: "00:1D:A5:09:BC:AA  clock offset: ...  class: ..."
-            if ":" in line and not line.startswith("Inquiring"):
-                mac = line.split()[0] if line.split() else None
-                if mac and len(mac) == 17 and mac.count(":") == 5 and mac not in seen:
-                    seen.add(mac)
-                    # Get the friendly name
-                    name = mac
-                    try:
-                        name_proc = subprocess.run(
-                            ["hcitool", "name", mac],
-                            capture_output=True, text=True, timeout=5,
-                        )
-                        if name_proc.stdout.strip():
-                            name = name_proc.stdout.strip()
-                    except Exception:
-                        pass
-                    is_obd = _is_likely_obd(name)
-                    devices.append({"mac": mac, "name": name, "obd": is_obd})
+            # Format: "00:1D:A5:09:BC:AA  DeviceName"
+            if not line or line.startswith("Scanning"):
+                continue
+            parts = line.split(None, 1)
+            mac = parts[0] if parts else None
+            if mac and len(mac) == 17 and mac.count(":") == 5 and mac not in seen:
+                seen.add(mac)
+                name = parts[1].strip() if len(parts) > 1 else mac
+                is_obd = _is_likely_obd(name)
+                devices.append({"mac": mac, "name": name, "obd": is_obd})
     except subprocess.TimeoutExpired:
-        logger.warning("hcitool inq timed out")
+        logger.warning("hcitool scan timed out")
     except FileNotFoundError:
         logger.warning("hcitool not found — skipping classic BT scan")
 
@@ -2450,6 +2490,73 @@ def _bt_scan_macos():
         pass
 
     return jsonify({"ok": True, "devices": devices})
+
+
+# ---------------------------------------------------------------------------
+# OBD Adapter Pairing
+# ---------------------------------------------------------------------------
+
+@app.route("/api/bt-pair", methods=["POST"])
+def api_bt_pair():
+    """Pair with an OBD2 Bluetooth adapter by MAC address.
+
+    Called when the user selects an adapter from the scan results.
+    Many OBD2 adapters don't support standard bluetoothctl pairing —
+    they just accept rfcomm connections directly. So we:
+      1. Try bluetoothctl pair (works for some adapters)
+      2. Always trust the device regardless
+      3. Test rfcomm bind to verify the adapter is reachable
+    Returns success if we can reach the device at all.
+    """
+    body = request.get_json(silent=True)
+    mac = (body or {}).get("mac", "").strip()
+    if not mac or mac.count(":") != 5:
+        return jsonify({"ok": False, "error": "Invalid MAC address"})
+
+    if platform.system() != "Linux":
+        return jsonify({"ok": True, "message": "Pairing skipped (not on Linux)"})
+
+    try:
+        # Step 1: Try bluetoothctl pair (best-effort — many OBD adapters skip this)
+        pair_out = subprocess.run(
+            ["bluetoothctl", "pair", mac],
+            capture_output=True, text=True, timeout=15,
+        )
+        pair_text = pair_out.stdout.lower() + pair_out.stderr.lower()
+        if "successful" in pair_text or "already paired" in pair_text:
+            logger.info(f"BT pair {mac}: bluetoothctl pairing successful")
+        else:
+            logger.info(f"BT pair {mac}: bluetoothctl pair didn't succeed ({pair_out.stdout.strip()}) — will try rfcomm directly")
+
+        # Step 2: Always trust the device so rfcomm bind works
+        subprocess.run(
+            ["bluetoothctl", "trust", mac],
+            capture_output=True, text=True, timeout=5,
+        )
+
+        # Step 3: Test rfcomm bind — release any existing binding first
+        subprocess.run(["rfcomm", "release", "0"], capture_output=True, timeout=3)
+        bind_result = subprocess.run(
+            ["rfcomm", "bind", "0", mac, str(config.OBD_BT_CHANNEL)],
+            capture_output=True, text=True, timeout=10,
+        )
+        bind_text = (bind_result.stdout + bind_result.stderr).lower()
+
+        # Clean up the test binding
+        subprocess.run(["rfcomm", "release", "0"], capture_output=True, timeout=3)
+
+        if bind_result.returncode == 0 or "already" in bind_text:
+            return jsonify({"ok": True, "message": f"Connected to {mac}"})
+        else:
+            # rfcomm bind failed — adapter may not be reachable
+            logger.warning(f"BT pair {mac}: rfcomm bind failed — {bind_text.strip()}")
+            return jsonify({"ok": False, "error": f"Could not reach {mac}. Is it plugged in and powered on?"})
+
+    except subprocess.TimeoutExpired:
+        return jsonify({"ok": False, "error": "Bluetooth pairing timed out"})
+    except Exception as e:
+        logger.warning(f"BT pair error: {e}")
+        return jsonify({"ok": False, "error": str(e)})
 
 
 # ---------------------------------------------------------------------------

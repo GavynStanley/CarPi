@@ -16,6 +16,7 @@
 #   https://python-obd.readthedocs.io/
 # =============================================================================
 
+import os
 import threading
 import time
 import logging
@@ -885,16 +886,12 @@ _KIA_MODE22_PIDS = {
     "F195": "ECU Serial Number",
 }
 
-# CAN headers for different Kia modules
+# CAN headers for Kia modules — only probe modules likely to support Mode 22.
+# Body modules (BCM, SRS, Cluster, Steering, Climate) rarely support UDS 0x22
+# and cause long timeouts when they don't respond, freezing the scan.
 _KIA_MODULES = {
     "7E0": "Engine (ECM)",
     "7E2": "Transmission (TCM)",
-    "7D0": "ABS / ESC",
-    "7A0": "Body Control (BCM)",
-    "7C4": "Airbag (SRS)",
-    "770": "Instrument Cluster",
-    "7B0": "Steering",
-    "7C0": "Climate Control",
 }
 
 
@@ -1008,14 +1005,33 @@ def _decode_kia_mode22(pid_hex, raw_hex_str):
     return fields if fields else None
 
 
-def _elm_send_raw(elm, cmd_str):
-    """Send a raw command via ELM327 and return joined response string."""
-    raw_lines = elm._ELM327__send(cmd_str.encode("ascii"))
-    if not raw_lines:
+def _elm_send_raw(elm, cmd_str, timeout=3):
+    """Send a raw command via ELM327 and return joined response string.
+
+    Uses a timeout thread to prevent indefinite hangs — some ECU modules
+    don't respond at all, and elm.__send() blocks until the ELM327 prompt.
+    """
+    result = [None]
+
+    def _do_send():
+        try:
+            result[0] = elm._ELM327__send(cmd_str.encode("ascii"))
+        except Exception as e:
+            logger.debug(f"ELM raw send '{cmd_str}' error: {e}")
+
+    t = threading.Thread(target=_do_send, daemon=True)
+    t.start()
+    t.join(timeout=timeout)
+
+    if t.is_alive():
+        logger.debug(f"ELM raw send '{cmd_str}' timed out after {timeout}s")
+        return ""
+
+    if not result[0]:
         return ""
     return " ".join(
         l.decode("ascii", errors="replace") if isinstance(l, bytes) else str(l)
-        for l in raw_lines
+        for l in result[0]
     ).strip()
 
 
@@ -1037,83 +1053,89 @@ def _scan_mode22_pids(connection):
         logger.warning("Cannot scan Mode 22 — no ELM327 interface")
         return results
 
-    for header, module_name in _KIA_MODULES.items():
-        # Set CAN header to target this module
-        try:
-            _elm_send_raw(elm, f"ATSH {header}")
-        except Exception as e:
-            logger.debug(f"Failed to set header {header}: {e}")
-            continue
+    try:
+        # Set a short ELM327 timeout for probing — don't wait long for
+        # non-responsive modules. AT ST 32 = 50 × 4ms = 200ms per command.
+        _elm_send_raw(elm, "ATST 32", timeout=2)
 
-        # Enter extended diagnostic session (UDS 10 03)
-        # This unlocks manufacturer-specific DIDs on many Kia/Hyundai ECUs
-        try:
-            session_resp = _elm_send_raw(elm, "1003")
-            # Positive response: 50 03 ... | Negative: 7F 10 XX
+        for header, module_name in _KIA_MODULES.items():
+            # Set CAN header to target this module
+            resp = _elm_send_raw(elm, f"ATSH {header}", timeout=2)
+            if "ERROR" in resp or "?" in resp:
+                logger.debug(f"Failed to set header {header}: {resp}")
+                continue
+
+            # Enter extended diagnostic session (UDS 10 03)
+            # This unlocks manufacturer-specific DIDs on many Kia/Hyundai ECUs
+            session_resp = _elm_send_raw(elm, "1003", timeout=3)
             if "7F" in session_resp:
                 logger.debug(f"Module {header} ({module_name}): extended session rejected — {session_resp}")
                 # Still try default session reads — some modules respond without it
+            elif not session_resp or "NO DATA" in session_resp:
+                logger.debug(f"Module {header} ({module_name}): no response to session request — skipping")
+                continue
             else:
                 logger.debug(f"Module {header} ({module_name}): extended session opened")
-        except Exception as e:
-            logger.debug(f"Module {header} session request failed: {e}")
 
-        module_found_pids = 0
+            module_found_pids = 0
 
-        for did_hex, pid_desc in _KIA_MODE22_PIDS.items():
-            try:
-                # Send as UDS Service 22 + DID (e.g., "22F190" not just "F190")
-                cmd = f"22{did_hex}"
-                resp = _elm_send_raw(elm, cmd)
+            for did_hex, pid_desc in _KIA_MODE22_PIDS.items():
+                try:
+                    # Send as UDS Service 22 + DID (e.g., "22F190" not just "F190")
+                    cmd = f"22{did_hex}"
+                    resp = _elm_send_raw(elm, cmd, timeout=3)
 
-                if not resp:
-                    continue
+                    if not resp:
+                        continue
 
-                # Skip error/empty/negative responses
-                # 7F = UDS negative response (e.g. "7E8 03 7F 22 31" = requestOutOfRange)
-                if "NO DATA" in resp or "ERROR" in resp or "?" in resp or "7F" in resp:
-                    continue
+                    # Skip error/empty/negative responses
+                    # 7F = UDS negative response (e.g. "7E8 03 7F 22 31" = requestOutOfRange)
+                    if "NO DATA" in resp or "ERROR" in resp or "?" in resp or "7F" in resp:
+                        continue
 
-                # Validate the response is actually a Service 22 positive response (62 XX XX)
-                # The emulator may echo back Mode 21 responses (61 XX) if it interprets
-                # "222103" as service 21 — filter those out
-                if "62" not in resp:
-                    logger.debug(f"Mode 22 {header}/{did_hex}: no '62' positive response prefix — {resp}")
-                    continue
+                    # Validate the response is actually a Service 22 positive response (62 XX XX)
+                    # The emulator may echo back Mode 21 responses (61 XX) if it interprets
+                    # "222103" as service 21 — filter those out
+                    if "62" not in resp:
+                        logger.debug(f"Mode 22 {header}/{did_hex}: no '62' positive response prefix — {resp}")
+                        continue
 
-                # Try to decode the raw response
-                decoded_fields = _decode_kia_mode22(did_hex, resp)
+                    # Try to decode the raw response
+                    decoded_fields = _decode_kia_mode22(did_hex, resp)
 
-                results.append({
-                    "service": "22",
-                    "pid": did_hex,
-                    "desc": f"{module_name} — {pid_desc}",
-                    "module": module_name,
-                    "header": header,
-                    "value": decoded_fields if decoded_fields else resp,
-                    "decoded": decoded_fields is not None,
-                    "unit": None,
-                    "raw": resp,
-                })
-                module_found_pids += 1
+                    results.append({
+                        "service": "22",
+                        "pid": did_hex,
+                        "desc": f"{module_name} — {pid_desc}",
+                        "module": module_name,
+                        "header": header,
+                        "value": decoded_fields if decoded_fields else resp,
+                        "decoded": decoded_fields is not None,
+                        "unit": None,
+                        "raw": resp,
+                    })
+                    module_found_pids += 1
 
-            except Exception as e:
-                logger.debug(f"Mode 22 probe {header}/{did_hex} failed: {e}")
+                except Exception as e:
+                    logger.debug(f"Mode 22 probe {header}/{did_hex} failed: {e}")
 
-        if module_found_pids > 0:
-            logger.info(f"Module {header} ({module_name}): {module_found_pids} extended PIDs found")
+            if module_found_pids > 0:
+                logger.info(f"Module {header} ({module_name}): {module_found_pids} extended PIDs found")
 
-        # Close diagnostic session — send '10 01' (return to default session)
+            # Close diagnostic session — send '10 01' (return to default session)
+            _elm_send_raw(elm, "1001", timeout=2)
+
+    except Exception as e:
+        logger.warning(f"Mode 22 scan error: {e}")
+    finally:
+        # Always restore ELM327 state so standard polling works after scan
         try:
-            _elm_send_raw(elm, "1001")
+            _elm_send_raw(elm, "1001", timeout=2)   # Close any open diagnostic session
+            _elm_send_raw(elm, "ATSH 7E0", timeout=2)  # Restore engine ECU header
+            _elm_send_raw(elm, "ATST FF", timeout=2)    # Restore default ELM timeout
+            _elm_send_raw(elm, "ATZ", timeout=3)         # Full ELM reset as safety net
         except Exception:
             pass
-
-    # Restore default header (engine ECU)
-    try:
-        _elm_send_raw(elm, "ATSH 7E0")
-    except Exception:
-        pass
 
     return results
 

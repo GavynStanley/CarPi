@@ -337,20 +337,19 @@ EOF
 # ---------------------------------------------------------------------------
 # 14. Custom MOTD — replace default Debian banner with SignalKit info
 # ---------------------------------------------------------------------------
-# Remove default MOTD and update-motd.d scripts
+# Remove all default MOTD sources
 on_chroot << 'EOF'
 rm -f /etc/motd
-rm -f /etc/update-motd.d/10-uname
-rm -f /etc/update-motd.d/20-*
-rm -f /etc/update-motd.d/30-*
-rm -f /etc/update-motd.d/50-*
+rm -f /etc/update-motd.d/*
 EOF
 
-# Install SignalKit MOTD script
-install -m 755 files/motd-signalkit \
-    "${ROOTFS_DIR}/etc/update-motd.d/10-signalkit"
-
-# Ensure /etc/motd is empty (dynamic MOTD comes from update-motd.d)
+# Empty /etc/motd so the default static banner is gone
 echo -n > "${ROOTFS_DIR}/etc/motd"
+
+# Install as /etc/profile.d/ script — this is sourced by bash on every
+# interactive login (SSH, console, etc.) and works on all Raspberry Pi OS
+# versions regardless of pam_motd configuration.
+install -m 755 files/motd-signalkit \
+    "${ROOTFS_DIR}/etc/profile.d/signalkit-motd.sh"
 
 echo "==> [01-signalkit-system] System configuration complete"
