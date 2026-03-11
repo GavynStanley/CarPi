@@ -24,8 +24,8 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PIGEN_DIR="${SCRIPT_DIR}/pi-gen"
-CONFIG="${SCRIPT_DIR}/pi-gen-config/config"
-STAGE_DIR="${SCRIPT_DIR}/pi-gen-config/stage-signalkit"
+CONFIG="${SCRIPT_DIR}/pi-gen-signalkit/config"
+STAGE_DIR="${SCRIPT_DIR}/pi-gen-signalkit/stage-signalkit"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 log()  { echo -e "${GREEN}[build]${NC} $*"; }
