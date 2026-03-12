@@ -22,6 +22,7 @@ ApplicationWindow {
     // -- View metadata for recent dock buttons --
     property var viewMeta: ({
         "dashboard": { icon: "bolt.svg",     label: "OBD",      color: root.accent },
+        "airplay":   { icon: "airplay.svg",  label: "AirPlay",   color: "#818cf8"   },
         "settings":  { icon: "settings.svg", label: "Settings",  color: "#a1a1aa"   },
         "dev":       { icon: "terminal.svg", label: "Dev",       color: "#f59e0b"   }
     })
@@ -39,7 +40,7 @@ ApplicationWindow {
         }
 
         // Calculate slide direction for transitions
-        var viewOrder = ["home", "dashboard", "settings", "dev"]
+        var viewOrder = ["home", "dashboard", "airplay", "settings", "dev"]
         var oldIdx = viewOrder.indexOf(previousView)
         var newIdx = viewOrder.indexOf(currentView)
         var goingForward = (currentView === "home") ? false : (previousView === "home") ? true : newIdx > oldIdx
@@ -121,6 +122,7 @@ ApplicationWindow {
     // -- Top bar: view title left, status + clock right --
     property string viewTitle: {
         if (currentView === "dashboard") return "DASHBOARD"
+        if (currentView === "airplay") return "AIRPLAY"
         if (currentView === "settings") return "SETTINGS"
         if (currentView === "dev") return "DEV CONSOLE"
         return ""
@@ -202,6 +204,18 @@ ApplicationWindow {
 
             opacity: root.currentView === "dashboard" ? 1 : 0
             transform: Translate { x: root.currentView === "dashboard" ? 0 : mainContent._slideOffset * mainContent._slideDirection }
+            Behavior on opacity { NumberAnimation { duration: root._transitionDuration; easing.type: Easing.OutCubic } }
+
+            visible: opacity > 0
+        }
+
+        AirPlayView {
+            id: airplayView
+            width: parent.width; height: parent.height
+            accent: root.accent
+
+            opacity: root.currentView === "airplay" ? 1 : 0
+            transform: Translate { x: root.currentView === "airplay" ? 0 : mainContent._slideOffset * mainContent._slideDirection }
             Behavior on opacity { NumberAnimation { duration: root._transitionDuration; easing.type: Easing.OutCubic } }
 
             visible: opacity > 0

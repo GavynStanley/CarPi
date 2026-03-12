@@ -204,45 +204,56 @@ BOOT_CONFIG="${ROOTFS_DIR}/boot/config.txt"
     BOOT_CONFIG="${ROOTFS_DIR}/boot/firmware/config.txt"
 
 # Append SignalKit display config to the boot config
+# NOTE: Uses [all] section for settings that work on every Pi model.
+# Pi 5 ignores legacy hdmi_group/hdmi_mode/hdmi_cvt — it uses KMS natively.
+# Display resolution is forced via kernel cmdline video= parameter instead.
 cat >> "${BOOT_CONFIG}" << 'EOF'
 
 # =============================================================================
 # SignalKit Display Configuration
 # =============================================================================
-# Force HDMI on even if no monitor is detected at boot
-hdmi_force_hotplug=1
 
-# Custom display mode for 800x480 LCD
-hdmi_group=2
-hdmi_mode=87
-hdmi_cvt=800 480 60 6 0 0 0
-hdmi_drive=2
+[all]
+# Force HDMI on even if no monitor is detected at boot (works on all models)
+hdmi_force_hotplug=1
 
 # Disable overscan (black borders) — our display fills edge-to-edge
 disable_overscan=1
-
-# GPU memory — Qt EGLFS uses GPU for rendering
-gpu_mem=128
 
 # Disable HDMI CEC — prevents external devices from sending
 # power-off/standby commands that blank the display
 hdmi_ignore_cec_init=1
 hdmi_ignore_cec=1
 
-# Never cut the HDMI signal — prevents "no signal" on the display.
-# 0 = HDMI output stays active even when DPMS/screensaver triggers.
-# Without this, the GPU firmware can power off the HDMI port entirely.
+# Never cut the HDMI signal — prevents "no signal" on the display
 hdmi_blanking=0
 
-# Disable the rainbow splash screen and text during boot for a cleaner startup
+# Disable the rainbow splash screen and text during boot
 disable_splash=1
 
-# =============================================================================
-# USB Gadget Mode (SSH over USB for development)
-# =============================================================================
-# Enables the Pi Zero 2 W's USB port as an ethernet gadget so you can
-# SSH in over a USB cable from a Mac/PC without WiFi or a keyboard.
+# --- Pi Zero 2W / Pi 3 / Pi 4 legacy display mode ---
+# These are ignored on Pi 5 (which uses KMS for display config).
+[pi02]
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt=800 480 60 6 0 0 0
+hdmi_drive=2
+gpu_mem=128
 dtoverlay=dwc2
+
+[pi4]
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt=800 480 60 6 0 0 0
+hdmi_drive=2
+gpu_mem=128
+
+[pi5]
+# Pi 5 uses KMS natively — resolution set via kernel cmdline video= parameter.
+# gpu_mem is ignored on Pi 5 (uses CMA allocator).
+# No USB gadget support on Pi 5 (USB-C is power-only).
+
+[all]
 EOF
 
 # ---------------------------------------------------------------------------
@@ -277,8 +288,11 @@ CMDLINE="${ROOTFS_DIR}/boot/cmdline.txt"
     CMDLINE="${ROOTFS_DIR}/boot/firmware/cmdline.txt"
 
 # cmdline.txt is a single line — read it, strip newline, append our params
+# NOTE: video=HDMI-A-1:800x480@60D forces the 800x480 display mode via KMS.
+# This works on Pi 5 (which ignores legacy hdmi_cvt) AND on Pi 4/Zero 2W.
+# The "D" suffix = force digital (DVI) mode.
 EXISTING=$(cat "${CMDLINE}" | tr -d '\n')
-for PARAM in "modules-load=dwc2,g_ether" "quiet" "splash" "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "systemd.show_status=false" "rd.systemd.show_status=false" "console=tty3" "consoleblank=0"; do
+for PARAM in "video=HDMI-A-1:800x480@60D" "quiet" "splash" "loglevel=0" "logo.nologo" "vt.global_cursor_default=0" "systemd.show_status=false" "rd.systemd.show_status=false" "console=tty3" "consoleblank=0"; do
     if ! echo "${EXISTING}" | grep -q "${PARAM}"; then
         EXISTING="${EXISTING} ${PARAM}"
     fi
@@ -293,8 +307,13 @@ echo "signalkit" > "${ROOTFS_DIR}/etc/hostname"
 sed -i "s/raspberrypi/signalkit/g" "${ROOTFS_DIR}/etc/hosts" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
-# 11. USB gadget networking — static IP on usb0
+# 11. USB gadget networking — static IP on usb0 (Pi Zero 2W only)
 # ---------------------------------------------------------------------------
+# Pi Zero 2W: dtoverlay=dwc2 (in [pi02] config.txt section) loads the dwc2
+# driver. We also need g_ether for the USB ethernet gadget. Load it via
+# modules-load.d so it's automatic but doesn't break Pi 5 (which has no dwc2).
+echo "g_ether" > "${ROOTFS_DIR}/etc/modules-load.d/usb-gadget.conf"
+
 # When the Pi is connected to a Mac/PC via USB, g_ether creates a usb0
 # interface. This service gives it a static link-local IP so SSH works
 # immediately without any config on the host side.

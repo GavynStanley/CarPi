@@ -41,8 +41,7 @@ Item {
             gradStart: "#1e1b4b"; gradEnd: "#272462"
             borderColor: "#4338ca"; iconColor: "#818cf8"
             iconSource: "" + iconsPath + "airplay.svg"
-            opacity: 0.4
-            onClicked: {}
+            onClicked: homeRoot.navigate("airplay")
         }
     }
 }

@@ -15,23 +15,40 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# ── AirPlay backend: optional import ───────────────────────────────
+_airplay_available = False
+try:
+    from airplay_manager import airplay as _airplay_mgr
+    _airplay_available = True
+except ImportError:
+    _airplay_mgr = None
+# ───────────────────────────────────────────────────────────────────
+
 # ── Qt backend: PySide6 (macOS dev) or PyQt6 (Raspberry Pi) ──────
 try:
     # PySide6 — macOS dev (pip-installed, needs plugin path fix)
-    import ctypes, ctypes.util
-    _libc = ctypes.CDLL(ctypes.util.find_library("c"))
-    import PySide6 as _pyside6
-    _qt_plugins = os.path.join(os.path.dirname(_pyside6.__file__), "Qt", "plugins")
-    _libc.setenv(b"QT_PLUGIN_PATH", _qt_plugins.encode(), ctypes.c_int(1))
+    # Must set env BEFORE importing any Qt modules so the platform plugin is found.
+    import importlib.util as _ilu
+    _spec = _ilu.find_spec("PySide6")
+    if _spec is None:
+        raise ImportError("PySide6 not installed")
+    _pyside6_dir = os.path.dirname(_spec.origin)
+    _qt_plugins = os.path.join(_pyside6_dir, "Qt", "plugins")
     os.environ["QT_PLUGIN_PATH"] = _qt_plugins
-    del _libc, _qt_plugins, _pyside6
+    # Also set at C level so Qt's internal getenv() sees it
+    import ctypes, ctypes.util
+    _libc_path = ctypes.util.find_library("c")
+    if _libc_path:
+        _libc = ctypes.CDLL(_libc_path)
+        _libc.setenv(b"QT_PLUGIN_PATH", _qt_plugins.encode(), ctypes.c_int(1))
+    del _ilu, _spec, _pyside6_dir, _qt_plugins
 
     from PySide6.QtCore import QObject, Property, Signal, QTimer, QUrl, Slot
     from PySide6.QtGui import QGuiApplication
     from PySide6.QtQml import QQmlApplicationEngine
     _BACKEND = "PySide6"
 
-except ImportError:
+except (ImportError, Exception):
     # PyQt6 — Raspberry Pi (system packages via apt)
     from PyQt6.QtCore import QObject, QTimer, QUrl
     from PyQt6.QtCore import pyqtProperty as Property
@@ -74,6 +91,7 @@ class Bridge(QObject):
     accentChanged = Signal()
     clockChanged = Signal()
     obdChanged = Signal()
+    airplayChanged = Signal()
 
     def __init__(self):
         super().__init__()
@@ -108,6 +126,18 @@ class Bridge(QObject):
         self._intake_air_temp = "---"
         self._speed_unit = "MPH"
         self._temp_unit = "°C"
+
+        # AirPlay state
+        self._airplay_available = _airplay_available and (
+            _airplay_mgr is not None and _airplay_mgr.available
+        )
+        self._airplay_running = False
+        self._airplay_connected = False
+        self._airplay_device = ""
+
+        # Wire AirPlay state change callback
+        if _airplay_mgr is not None:
+            _airplay_mgr.on_state_changed = self._on_airplay_state_changed
 
         # Clock timer (every 10s)
         self._clock_timer = QTimer(self)
@@ -366,6 +396,43 @@ class Bridge(QObject):
     def intakeAirTemp(self):
         return self._intake_air_temp
 
+    # ── AirPlay Properties ─────────────────────────────────────────
+
+    @Property(bool, notify=airplayChanged)
+    def airplayAvailable(self):
+        return self._airplay_available
+
+    @Property(bool, notify=airplayChanged)
+    def airplayRunning(self):
+        return self._airplay_running
+
+    @Property(bool, notify=airplayChanged)
+    def airplayConnected(self):
+        return self._airplay_connected
+
+    @Property(str, notify=airplayChanged)
+    def airplayDevice(self):
+        return self._airplay_device
+
+    @Slot()
+    def startAirplay(self):
+        if _airplay_mgr is not None:
+            _airplay_mgr.start()
+
+    @Slot()
+    def stopAirplay(self):
+        if _airplay_mgr is not None:
+            _airplay_mgr.stop()
+
+    def _on_airplay_state_changed(self):
+        """Called from AirPlay manager thread — update state and emit signal."""
+        if _airplay_mgr is None:
+            return
+        self._airplay_running = _airplay_mgr.running
+        self._airplay_connected = _airplay_mgr.connected
+        self._airplay_device = _airplay_mgr.device_name
+        self.airplayChanged.emit()
+
 
 def main():
     # Set up logging when run standalone
@@ -424,6 +491,9 @@ def main():
     exit_code = app.exec()
 
     # Clean shutdown
+    if _airplay_mgr is not None:
+        _airplay_mgr.stop()
+
     if obd_thread is not None:
         logger.info("Stopping OBD reader")
         obd_thread.stop()

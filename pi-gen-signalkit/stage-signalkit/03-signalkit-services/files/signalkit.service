@@ -24,6 +24,19 @@ WorkingDirectory=/opt/signalkit/signalkit
 # Release the fbcon VT before starting so EGLFS can claim DRM master
 ExecStartPre=/bin/sh -c 'echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true'
 
+# Auto-detect the correct DRM card for EGLFS.
+# Pi 5 exposes HDMI on /dev/dri/card1 (card0 is RP1 internal), while
+# Pi Zero 2W / Pi 4 use /dev/dri/card0 or card1. We write a small JSON
+# config that Qt EGLFS reads to find the right device.
+ExecStartPre=/bin/sh -c '\
+    for card in /dev/dri/card*; do \
+        if udevadm info -q property "$card" 2>/dev/null | grep -q "ID_PATH.*platform.*gpu"; then \
+            echo "{\"device\":\"$card\"}" > /tmp/signalkit-kms.json; \
+            exit 0; \
+        fi; \
+    done; \
+    echo "{}" > /tmp/signalkit-kms.json'
+
 # Qt EGLFS: render directly to DRM/KMS — no X11, no Wayland
 ExecStart=/usr/bin/python3 /opt/signalkit/signalkit/qml_display.py -platform eglfs
 
@@ -34,7 +47,8 @@ RestartSec=5
 # Qt EGLFS configuration
 Environment=QT_QPA_PLATFORM=eglfs
 Environment=QT_QPA_EGLFS_INTEGRATION=eglfs_kms
-Environment=QT_QPA_EGLFS_KMS_ATOMIC=0
+Environment=QT_QPA_EGLFS_KMS_ATOMIC=1
+Environment=QT_QPA_EGLFS_KMS_CONFIG=/tmp/signalkit-kms.json
 Environment=QT_QPA_EGLFS_HIDECURSOR=1
 Environment=XDG_RUNTIME_DIR=/tmp/runtime-signalkit
 
