@@ -1,0 +1,29 @@
+[Unit]
+Description=SignalKit AirPlay Receiver (UxPlay)
+Documentation=https://github.com/FDH2/UxPlay
+After=network-online.target avahi-daemon.service
+Wants=network-online.target avahi-daemon.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# AirPlay receiver configuration:
+#   -n  "SignalKit"    — name shown on iPhone's AirPlay device list
+#   -nh                — no hold (exit when client disconnects, systemd restarts)
+#   -vs kmssink        — render video directly to DRM/KMS (no X11 needed)
+#   -as alsasink       — audio via ALSA
+#   -avdec             — use software H.264/H.265 decoders (no V4L2 on Pi 5)
+ExecStart=/usr/local/bin/uxplay -n "SignalKit" -nh -vs kmssink -as alsasink -avdec
+
+# Restart automatically when the AirPlay client disconnects
+Restart=always
+RestartSec=2
+
+# Resource limits
+Nice=-5
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

@@ -20,6 +20,20 @@
 echo "==> [01-signalkit-system] Configuring SignalKit system layer"
 
 # ---------------------------------------------------------------------------
+# 0a. Fix Debian archive keyring — pi-gen arm64 export stage writes
+#     debian.sources with Signed-By: ...debian-archive-keyring.pgp
+#     but the package installs ...debian-archive-keyring.gpg
+# ---------------------------------------------------------------------------
+on_chroot << 'EOF'
+if [ -f /usr/share/keyrings/debian-archive-keyring.gpg ] && \
+   [ ! -f /usr/share/keyrings/debian-archive-keyring.pgp ]; then
+    cp /usr/share/keyrings/debian-archive-keyring.gpg \
+       /usr/share/keyrings/debian-archive-keyring.pgp
+    echo "Fixed debian-archive-keyring .gpg -> .pgp"
+fi
+EOF
+
+# ---------------------------------------------------------------------------
 # 0. Install packages that have interactive conffile prompts
 # ---------------------------------------------------------------------------
 # hostapd ships /etc/default/hostapd as a conffile. When apt installs it
@@ -44,7 +58,7 @@ EOF
 on_chroot << 'EOF'
 echo "Removing unnecessary packages..."
 
-# Mark Qt/PyQt packages as manually installed so autoremove won't purge them
+# Mark packages we need as manually installed so autoremove won't purge them
 apt-mark manual \
     python3-pyqt6 python3-pyqt6.qtquick python3-pyqt6.qtqml \
     qt6-qpa-plugins libqt6quick6 libqt6qml6 libqt6core6 libqt6gui6 \
@@ -52,7 +66,17 @@ apt-mark manual \
     qml6-module-qtquick qml6-module-qtquick-controls \
     qml6-module-qtquick-layouts qml6-module-qtquick-templates \
     qml6-module-qtquick-window \
+    hostapd dnsmasq \
+    gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad gstreamer1.0-libav gstreamer1.0-gl \
+    gstreamer1.0-alsa gstreamer1.0-tools libgstreamer1.0-0 \
+    avahi-daemon alsa-utils \
     2>/dev/null || true
+
+# Pi 5 only — remove the generic arm64 kernel (rpi-v8) to save ~100MB
+# The Pi 5 boots with kernel_2712.img, not kernel8.img
+apt-get remove -y --purge linux-image-rpi-v8 2>/dev/null || true
+rm -f /boot/firmware/kernel8.img /boot/firmware/initramfs8 2>/dev/null || true
 
 # Services/daemons we don't need (may or may not be present)
 apt-get remove -y --purge \
@@ -214,17 +238,15 @@ BOOT_CONFIG="${ROOTFS_DIR}/boot/config.txt"
     BOOT_CONFIG="${ROOTFS_DIR}/boot/firmware/config.txt"
 
 # Append SignalKit display config to the boot config
-# NOTE: Uses [all] section for settings that work on every Pi model.
-# Pi 5 ignores legacy hdmi_group/hdmi_mode/hdmi_cvt — it uses KMS natively.
-# Display resolution is forced via kernel cmdline video= parameter instead.
+# Pi 5 only — uses KMS natively, resolution set via kernel cmdline video= parameter.
 cat >> "${BOOT_CONFIG}" << 'EOF'
 
 # =============================================================================
-# SignalKit Display Configuration
+# SignalKit Display Configuration (Pi 5)
 # =============================================================================
 
 [all]
-# Force HDMI on even if no monitor is detected at boot (works on all models)
+# Force HDMI on even if no monitor is detected at boot
 hdmi_force_hotplug=1
 
 # Disable overscan (black borders) — our display fills edge-to-edge
@@ -240,28 +262,6 @@ hdmi_blanking=0
 
 # Disable the rainbow splash screen and text during boot
 disable_splash=1
-
-# --- Pi Zero 2W / Pi 3 / Pi 4 legacy display mode ---
-# These are ignored on Pi 5 (which uses KMS for display config).
-[pi02]
-hdmi_group=2
-hdmi_mode=87
-hdmi_cvt=800 480 60 6 0 0 0
-hdmi_drive=2
-gpu_mem=128
-dtoverlay=dwc2
-
-[pi4]
-hdmi_group=2
-hdmi_mode=87
-hdmi_cvt=800 480 60 6 0 0 0
-hdmi_drive=2
-gpu_mem=128
-
-[pi5]
-# Pi 5 uses KMS natively — resolution set via kernel cmdline video= parameter.
-# gpu_mem is ignored on Pi 5 (uses CMA allocator).
-# No USB gadget support on Pi 5 (USB-C is power-only).
 
 [all]
 EOF
@@ -317,36 +317,8 @@ echo "signalkit" > "${ROOTFS_DIR}/etc/hostname"
 sed -i "s/raspberrypi/signalkit/g" "${ROOTFS_DIR}/etc/hosts" 2>/dev/null || true
 
 # ---------------------------------------------------------------------------
-# 11. USB gadget networking — static IP on usb0 (Pi Zero 2W only)
+# 11. USB gadget networking — REMOVED (Pi 5 has no USB gadget support)
 # ---------------------------------------------------------------------------
-# Pi Zero 2W: dtoverlay=dwc2 (in [pi02] config.txt section) loads the dwc2
-# driver. We also need g_ether for the USB ethernet gadget. Load it via
-# modules-load.d so it's automatic but doesn't break Pi 5 (which has no dwc2).
-echo "g_ether" > "${ROOTFS_DIR}/etc/modules-load.d/usb-gadget.conf"
-
-# When the Pi is connected to a Mac/PC via USB, g_ether creates a usb0
-# interface. This service gives it a static link-local IP so SSH works
-# immediately without any config on the host side.
-cat > "${ROOTFS_DIR}/etc/systemd/system/usb-gadget-ip.service" << 'EOF'
-[Unit]
-Description=Configure USB gadget ethernet (usb0) with static IP
-After=network-pre.target sys-subsystem-net-devices-usb0.device
-Wants=sys-subsystem-net-devices-usb0.device
-ConditionPathExists=/sys/class/net/usb0
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/sbin/ip addr add 169.254.100.2/16 dev usb0
-ExecStart=/sbin/ip link set usb0 up
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-on_chroot << 'EOF'
-systemctl enable usb-gadget-ip.service
-EOF
 
 # ---------------------------------------------------------------------------
 # 12. Display permissions (no X11)

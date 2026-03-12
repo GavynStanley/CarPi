@@ -143,11 +143,10 @@ class AirPlayManager:
         ]
 
         if IS_PI:
-            # Pi: use hardware H.264 decode → video4linux2 → autovideosink
-            # For EGLFS, we use kmssink or fbdevsink depending on what's available
+            # Pi 5: software decode (avdec) → kmssink (direct DRM/KMS, no X11)
             cmd.extend([
-                "-avdec",                          # Use avdec for decoding
-                "-vs", "autovideosink",             # Let GStreamer pick best sink
+                "-avdec",                          # Software H.264/H.265 decode
+                "-vs", "kmssink",                   # Render direct to DRM/KMS
                 "-as", "alsasink",                  # Audio via ALSA
             ])
         else:

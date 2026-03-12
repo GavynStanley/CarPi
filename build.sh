@@ -62,8 +62,15 @@ step "Pre-flight checks"
 
 # Check vendored pi-gen exists — clone if missing
 if [[ ! -d "${PIGEN_DIR}" ]] || [[ ! -f "${PIGEN_DIR}/build.sh" ]]; then
-    log "pi-gen not found — cloning from GitHub..."
+    log "pi-gen not found — cloning arm64 branch from GitHub..."
     git clone --depth=1 -b arm64 https://github.com/RPi-Distro/pi-gen.git "${PIGEN_DIR}"
+
+    # Patch: use lazy unmount (-l) to prevent "target is busy" failures
+    # under QEMU emulation (zombie qemu-aarch64-static processes hold mounts)
+    if grep -q 'xargs -r umount;' "${PIGEN_DIR}/scripts/common" 2>/dev/null; then
+        sed -i 's/xargs -r umount;/xargs -r umount -l;/g' "${PIGEN_DIR}/scripts/common"
+        log "Applied lazy unmount fix to pi-gen"
+    fi
 fi
 
 # Check config file exists

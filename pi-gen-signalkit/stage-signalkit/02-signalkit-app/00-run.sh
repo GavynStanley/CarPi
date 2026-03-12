@@ -62,7 +62,38 @@ python3 -c "import PyQt6.QtCore; print('  PyQt6', PyQt6.QtCore.PYQT_VERSION_STR)
 EOF
 
 # ---------------------------------------------------------------------------
-# 3. Create a log directory that survives the read-only root
+# 3. Build and install UxPlay v1.71+ from source (AirPlay 2 casting support)
+# ---------------------------------------------------------------------------
+# The Debian repo version is too old for media casting (YouTube etc.).
+# v1.71+ adds AirPlay HLS video streaming support.
+on_chroot << 'EOF'
+echo "Building UxPlay from source..."
+UXPLAY_VERSION="v1.71"
+
+cd /tmp
+git clone --depth=1 --branch "${UXPLAY_VERSION}" \
+    https://github.com/FDH2/UxPlay.git uxplay-src 2>/dev/null \
+    || git clone --depth=1 https://github.com/FDH2/UxPlay.git uxplay-src
+
+cd uxplay-src
+mkdir build && cd build
+cmake ..
+make -j$(nproc)
+make install
+ldconfig
+
+echo "UxPlay installed:"
+uxplay -v 2>&1 || true
+
+# Clean up build artifacts
+cd /
+rm -rf /tmp/uxplay-src
+
+echo "UxPlay build complete"
+EOF
+
+# ---------------------------------------------------------------------------
+# 4. Create a log directory that survives the read-only root
 # ---------------------------------------------------------------------------
 install -d -m 755 "${ROOTFS_DIR}/var/log/signalkit"
 on_chroot << 'EOF'

@@ -16,6 +16,7 @@ echo "==> [03-signalkit-services] Installing systemd services"
 # SignalKit dashboard service (Qt/QML + EGLFS)
 # ---------------------------------------------------------------------------
 install -m 644 files/signalkit.service "${ROOTFS_DIR}/etc/systemd/system/signalkit.service"
+install -m 755 files/detect-drm.sh "${ROOTFS_DIR}/opt/signalkit/detect-drm.sh"
 
 # Create XDG_RUNTIME_DIR for Qt at boot (tmpfiles.d survives reboots)
 cat > "${ROOTFS_DIR}/etc/tmpfiles.d/signalkit-runtime.conf" << 'EOF'
@@ -51,6 +52,17 @@ install -m 755 files/signalkit-gen-hostapd.sh \
 on_chroot << 'EOF'
 systemctl enable signalkit-wifi.service
 echo "signalkit-wifi.service enabled"
+EOF
+
+# ---------------------------------------------------------------------------
+# AirPlay receiver service (UxPlay → kmssink, no X11)
+# ---------------------------------------------------------------------------
+install -m 644 files/signalkit-airplay.service \
+    "${ROOTFS_DIR}/etc/systemd/system/signalkit-airplay.service"
+
+on_chroot << 'EOF'
+systemctl enable signalkit-airplay.service
+echo "signalkit-airplay.service enabled"
 EOF
 
 echo "==> [03-signalkit-services] Services installed"
